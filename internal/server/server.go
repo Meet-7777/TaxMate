@@ -1,15 +1,15 @@
 package server
 
 import (
-	"net/http"
-
+	"github.com/Meet-7777/taxmate-server/internal/health"
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 )
 
-func New() *chi.Mux {
+func New(db *pgxpool.Pool, redis *redis.Client) *chi.Mux {
 	router := chi.NewRouter()
-	router.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("TaxMate API"))
-	})
+	healthHandler := health.NewHandler(db, redis)
+	router.Get("/health", healthHandler.Check)
 	return router
 }
