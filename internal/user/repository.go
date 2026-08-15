@@ -16,6 +16,10 @@ type User struct {
 	PhoneVerified bool
 }
 
+type UserRepository interface {
+	Create(ctx context.Context, email string, passwordHash string) (User, error)
+}
+
 type Repository struct {
 	db *pgxpool.Pool
 }
@@ -26,7 +30,7 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 	}
 }
 
-func (r *Repository) Create(ctx context.Context, email string, PasswordHash string) (User, error) {
+func (r *Repository) Create(ctx context.Context, email string, passwordHash string) (User, error) {
 	var u User
 	err := r.db.QueryRow(ctx, `INSERT INTO users (
 			id,
@@ -40,6 +44,6 @@ func (r *Repository) Create(ctx context.Context, email string, PasswordHash stri
 			password_hash,
 			phone_number,
 			email_verified,
-			phone_verified`, uuid.New(), email, PasswordHash).Scan(&u.ID, &u.Email, &u.PasswordHash, &u.PhoneNumber, &u.EmailVerified, &u.PhoneVerified)
+			phone_verified`, uuid.New(), email, passwordHash).Scan(&u.ID, &u.Email, &u.PasswordHash, &u.PhoneNumber, &u.EmailVerified, &u.PhoneVerified)
 	return u, err
 }
