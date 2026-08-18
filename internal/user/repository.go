@@ -18,6 +18,7 @@ type User struct {
 
 type UserRepository interface {
 	Create(ctx context.Context, email string, passwordHash string) (User, error)
+	FindByEmail(ctx context.Context, email string) (User, error)
 }
 
 type Repository struct {
@@ -45,5 +46,12 @@ func (r *Repository) Create(ctx context.Context, email string, passwordHash stri
 			phone_number,
 			email_verified,
 			phone_verified`, uuid.New(), email, passwordHash).Scan(&u.ID, &u.Email, &u.PasswordHash, &u.PhoneNumber, &u.EmailVerified, &u.PhoneVerified)
+	return u, err
+}
+
+func (r *Repository) FindByEmail(ctx context.Context, email string) (User, error) {
+	var u User
+	err := r.db.QueryRow(ctx,
+		`SELECT id, email, password_hash, phone_number, email_verified, phone_verified FROM users WHERE email=$1`, email).Scan(&u.ID, &u.Email, &u.PasswordHash, &u.PhoneNumber, &u.EmailVerified, &u.PhoneVerified)
 	return u, err
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/Meet-7777/taxmate-server/internal/session"
 	"github.com/Meet-7777/taxmate-server/internal/user"
 	"github.com/Meet-7777/taxmate-server/pkg/crypto"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -11,14 +12,17 @@ import (
 
 var ErrInvalidPassword = errors.New("password must be at least 8 characters")
 var ErrEmailAlreadyExists = errors.New("email already exists")
+var ErrInvalidCredentials = errors.New("invalid credentials")
 
 type Service struct {
-	users user.UserRepository
+	users   user.UserRepository
+	session session.Repository
 }
 
-func NewService(repo user.UserRepository) *Service {
+func NewService(repo user.UserRepository, sessionRepo session.Repository) *Service {
 	return &Service{
-		users: repo,
+		users:   repo,
+		session: sessionRepo,
 	}
 }
 
@@ -50,4 +54,16 @@ func (s *Service) Signup(
 	}
 
 	return newUser, nil
+}
+
+func (s *Service) Login(
+	ctx context.Context, email string, password string) (user.User, error) {
+	u, err := s.users.FindByEmail(ctx, email)
+	if err != nil {
+		return user.User{}, ErrInvalidCredentials
+	}
+	if !crypto.VerifyPassword(password, u.PasswordHash) {
+		return user.User{}, ErrInvalidCredentials
+	}
+	return u, nil
 }
