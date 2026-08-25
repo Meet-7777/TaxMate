@@ -54,6 +54,7 @@ func (h *Handler) Signup(w http.ResponseWriter, r *http.Request) {
 
 		if errors.Is(err, ErrEmailAlreadyExists) {
 			http.Error(w, err.Error(), http.StatusConflict)
+			return
 		}
 
 		http.Error(w, "failed to create user", http.StatusInternalServerError)
@@ -88,11 +89,67 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to login", http.StatusInternalServerError)
 		return
 	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    u.RefreshToken,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   7 * 24 * 60 * 60,
+	})
+	http.SetCookie(w, &http.Cookie{
+		Name:     "access_token",
+		Value:    u.AccessToken,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   15 * 60,
+	})
+
 	response := map[string]string{
-		"id":    u.ID.String(),
-		"email": u.Email,
+		"id":    u.User.ID.String(),
+		"email": u.User.Email,
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
+}
+
+func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
+
+	cookie, err := r.Cookie("refresh_token")
+	if err != nil {
+		http.Error(w, "missing refresh token", http.StatusUnauthorized)
+		return
+	}
+
+	accessToken, err := h.service.Refresh(
+		r.Context(),
+		cookie.Value,
+	)
+	if err != nil {
+		if errors.Is(err, ErrInvalidRefreshToken) {
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return
+		}
+
+		http.Error(
+			w,
+			"failed to refresh session",
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "access_token",
+		Value:    accessToken,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   15 * 60,
+	})
+
+	w.WriteHeader(http.StatusOK)
 }

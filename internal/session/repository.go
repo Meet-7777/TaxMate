@@ -8,6 +8,7 @@ import (
 
 type Repository interface {
 	Create(ctx context.Context, s *Session) error
+	FindByRefreshTokenHash(ctx context.Context, refreshTokenHash string) (*Session, error)
 }
 
 type PostgresRepository struct {
@@ -28,4 +29,23 @@ func (r *PostgresRepository) Create(ctx context.Context, s *Session) error {
 	`, s.ID, s.UserID, s.RefreshTokenHash, s.ExpiresAt, s.CreatedAt)
 	return err
 
+}
+
+func (r *PostgresRepository) FindByRefreshTokenHash(ctx context.Context, refreshTokenHash string) (*Session, error) {
+	var s Session
+	err := r.db.QueryRow(ctx, `
+	SELECT
+			id,
+			user_id,
+			refresh_token_hash,
+			expires_at,
+			created_at,
+			revoked_at
+		FROM sessions
+		WHERE refresh_token_hash = $1
+	`, refreshTokenHash).Scan(&s.ID, &s.UserID, &s.RefreshTokenHash, &s.ExpiresAt, &s.CreatedAt, &s.RevokedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &s, err
 }

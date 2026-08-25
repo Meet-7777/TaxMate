@@ -24,6 +24,6 @@ func New(db *pgxpool.Pool, redis *redis.Client) *chi.Mux {
 
 	router.Post("/auth/signup", authHandler.Signup)
 	router.Post("/auth/login", authHandler.Login)
-
+	router.Post("/auth/refresh", authHandler.Refresh)
 	return router
 }
