@@ -3,6 +3,7 @@ package server
 import (
 	"github.com/Meet-7777/taxmate-server/internal/auth"
 	"github.com/Meet-7777/taxmate-server/internal/health"
+	"github.com/Meet-7777/taxmate-server/internal/middleware"
 	"github.com/Meet-7777/taxmate-server/internal/session"
 	"github.com/Meet-7777/taxmate-server/internal/user"
 	"github.com/go-chi/chi/v5"
@@ -25,5 +26,7 @@ func New(db *pgxpool.Pool, redis *redis.Client) *chi.Mux {
 	router.Post("/auth/signup", authHandler.Signup)
 	router.Post("/auth/login", authHandler.Login)
 	router.Post("/auth/refresh", authHandler.Refresh)
+
+	router.With(middleware.Auth).Get("/me", authHandler.Me)
 	return router
 }

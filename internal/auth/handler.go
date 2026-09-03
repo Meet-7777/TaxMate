@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+
+	"github.com/Meet-7777/taxmate-server/internal/middleware"
 )
 
 type Handler struct {
@@ -152,4 +154,19 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 	})
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserID(r.Context())
+	if !ok {
+		http.Error(w, "user not found", http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]string{
+		"id": userID.String(),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }
