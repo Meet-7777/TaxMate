@@ -119,20 +119,27 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
-
 	cookie, err := r.Cookie("refresh_token")
 	if err != nil {
-		http.Error(w, "missing refresh token", http.StatusUnauthorized)
+		http.Error(
+			w,
+			"missing refresh token",
+			http.StatusUnauthorized,
+		)
 		return
 	}
 
-	accessToken, err := h.service.Refresh(
+	result, err := h.service.Refresh(
 		r.Context(),
 		cookie.Value,
 	)
 	if err != nil {
 		if errors.Is(err, ErrInvalidRefreshToken) {
-			http.Error(w, err.Error(), http.StatusUnauthorized)
+			http.Error(
+				w,
+				err.Error(),
+				http.StatusUnauthorized,
+			)
 			return
 		}
 
@@ -145,8 +152,17 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.SetCookie(w, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    result.RefreshToken,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   7 * 24 * 60 * 60,
+	})
+
+	http.SetCookie(w, &http.Cookie{
 		Name:     "access_token",
-		Value:    accessToken,
+		Value:    result.AccessToken,
 		Path:     "/",
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,

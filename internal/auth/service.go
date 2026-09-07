@@ -20,8 +20,9 @@ var ErrInvalidCredentials = errors.New("invalid credentials")
 var ErrInvalidRefreshToken = errors.New("invalid refresh token")
 
 type Service struct {
-	users   user.UserRepository
-	session session.Repository
+	users       user.UserRepository
+	session     session.Repository
+	coordinator *session.RefreshCoordinator
 }
 
 type LoginResult struct {
@@ -32,8 +33,9 @@ type LoginResult struct {
 
 func NewService(repo user.UserRepository, sessionRepo session.Repository) *Service {
 	return &Service{
-		users:   repo,
-		session: sessionRepo,
+		users:       repo,
+		session:     sessionRepo,
+		coordinator: session.NewRefreshCoordinator(),
 	}
 }
 
@@ -84,10 +86,13 @@ func (s *Service) Login(
 	if err != nil {
 		return LoginResult{}, err
 	}
+	sessionID := uuid.New()
+
 	newSession := &session.Session{
-		ID:               uuid.New(),
+		ID:               sessionID,
 		UserID:           u.ID,
 		RefreshTokenHash: crypto.HashToken(refreshToken),
+		FamilyID:         sessionID,
 		ExpiresAt:        time.Now().Add(7 * 24 * time.Hour),
 		CreatedAt:        time.Now(),
 	}
@@ -101,21 +106,77 @@ func (s *Service) Login(
 	}, nil
 }
 
-func (s *Service) Refresh(ctx context.Context, refreshToken string) (string, error) {
+func (s *Service) Refresh(
+	ctx context.Context,
+	refreshToken string,
+) (LoginResult, error) {
 	refreshTokenHash := crypto.HashToken(refreshToken)
-	currentSession, err := s.session.FindByRefreshTokenHash(ctx, refreshTokenHash)
-	if err != nil {
-		return "", ErrInvalidRefreshToken
+
+	unlock := s.coordinator.Lock(refreshTokenHash)
+	defer unlock()
+
+	if cached, ok := s.coordinator.Get(refreshTokenHash); ok {
+		return LoginResult{
+			RefreshToken: cached.RefreshToken,
+			AccessToken:  cached.AccessToken,
+		}, nil
 	}
+
+	currentSession, err := s.session.FindByRefreshTokenHash(
+		ctx,
+		refreshTokenHash,
+	)
+	if err != nil {
+		return LoginResult{}, ErrInvalidRefreshToken
+	}
+
 	if currentSession.RevokedAt != nil {
-		return "", ErrInvalidRefreshToken
+		return LoginResult{}, ErrInvalidRefreshToken
 	}
+
 	if time.Now().After(currentSession.ExpiresAt) {
-		return "", ErrInvalidRefreshToken
+		return LoginResult{}, ErrInvalidRefreshToken
 	}
-	accessToken, err := token.CreateAccessToken(currentSession.UserID)
+
+	newRefreshToken, err := crypto.GenerateToken()
 	if err != nil {
-		return "", err
+		return LoginResult{}, err
 	}
-	return accessToken, nil
+
+	newAccessToken, err := token.CreateAccessToken(currentSession.UserID)
+	if err != nil {
+		return LoginResult{}, err
+	}
+
+	newSession := &session.Session{
+		ID:               uuid.New(),
+		UserID:           currentSession.UserID,
+		RefreshTokenHash: crypto.HashToken(newRefreshToken),
+		FamilyID:         currentSession.FamilyID,
+		ExpiresAt:        currentSession.ExpiresAt,
+		CreatedAt:        time.Now(),
+	}
+
+	if err := s.session.Rotate(
+		ctx,
+		currentSession.ID,
+		newSession,
+	); err != nil {
+		return LoginResult{}, ErrInvalidRefreshToken
+	}
+
+	result := session.RefreshResult{
+		RefreshToken: newRefreshToken,
+		AccessToken:  newAccessToken,
+	}
+
+	s.coordinator.Set(refreshTokenHash, result)
+
+	return LoginResult{
+		User: user.User{
+			ID: currentSession.UserID,
+		},
+		RefreshToken: newRefreshToken,
+		AccessToken:  newAccessToken,
+	}, nil
 }
