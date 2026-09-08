@@ -2,8 +2,9 @@ import axios, { type AxiosError } from 'axios'
 
 // All auth is cookie-based — no Authorization header needed.
 // withCredentials ensures the browser sends HttpOnly cookies on every request.
+// VITE_API_BASE_URL defaults to '/' so the Vite dev proxy handles routing.
 const api = axios.create({
-  baseURL: '/',
+  baseURL: import.meta.env.VITE_API_BASE_URL ?? '/',
   withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
 })

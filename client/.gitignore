@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Local env — never commit real values
+.env
+.env.local
+.env.*.local
+# .env.example is intentionally NOT ignored — it's the committed template
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
