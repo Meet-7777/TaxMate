@@ -86,3 +86,17 @@
     letter-spacing: -0.01em;
   }
 }
+
+/* ── Landing page ── */
+@layer base {
+  /* Smooth anchor scrolling for in-page nav links */
+  html:has(.landing) {
+    scroll-behavior: smooth;
+  }
+
+  /* Remove the global box-shadow:none override for the landing page
+     backdrop-blur needs no shadow interference */
+  .landing * {
+    box-shadow: revert !important;
+  }
+}

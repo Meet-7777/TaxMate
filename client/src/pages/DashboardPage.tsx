@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { Card, CardContent, CardHeader, CardDescription } from '@/components/ui/card'
+import { TaxMateWordmark } from '@/components/TaxMateLogo'
 
 const stats = [
   { label: 'Tax Returns Filed', value: '—', icon: FileText, sub: 'This financial year' },
@@ -23,15 +24,9 @@ export default function DashboardPage() {
       <header className="border-b border-[hsl(var(--border))] bg-[hsl(var(--card))]">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-0 h-14">
           {/* Logo */}
-          <div className="flex items-center gap-2.5">
-            <div
-              className="h-7 w-7 flex items-center justify-center shrink-0"
-              style={{ backgroundColor: '#2C5F4E' }}
-            >
-              <span className="text-white text-xs font-bold">T</span>
-            </div>
-            <span className="text-sm font-semibold tracking-tight">TaxMate</span>
-          </div>
+          <Link to="/">
+            <TaxMateWordmark size={26} />
+          </Link>
 
           {/* Account menu */}
           <div className="relative">

@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AnimatePresence } from 'framer-motion'
 import { AuthProvider } from '@/context/AuthContext'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
+import LandingPage from '@/pages/LandingPage'
 import LoginPage from '@/pages/LoginPage'
 import SignupPage from '@/pages/SignupPage'
 import DashboardPage from '@/pages/DashboardPage'
@@ -21,7 +22,8 @@ export default function App() {
         <BrowserRouter>
           <AnimatePresence mode="wait">
             <Routes>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              {/* Landing page — unauthenticated root */}
+              <Route path="/" element={<LandingPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/signup" element={<SignupPage />} />
               <Route
@@ -40,8 +42,8 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
-              {/* Catch-all */}
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              {/* Catch-all → landing */}
+              <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </AnimatePresence>
         </BrowserRouter>
