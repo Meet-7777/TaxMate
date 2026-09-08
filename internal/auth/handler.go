@@ -175,6 +175,59 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+// Logout clears both auth cookies. The client is responsible for dropping
+// local state. Without a logout endpoint the cookies would persist for their
+// full MaxAge even after the user clicks "sign out".
+func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
+	clearAuthCookies(w)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+type ChangePasswordRequest struct {
+	OldPassword string `json:"old_password"`
+	NewPassword string `json:"new_password"`
+}
+
+// ChangePassword is a protected endpoint — requires a valid access_token cookie.
+func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserID(r.Context())
+	if !ok {
+		http.Error(w, "user not found", http.StatusInternalServerError)
+		return
+	}
+
+	var req ChangePasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	if req.OldPassword == "" || req.NewPassword == "" {
+		http.Error(w, "old_password and new_password are required", http.StatusBadRequest)
+		return
+	}
+
+	err := h.service.ChangePassword(r.Context(), userID, req.OldPassword, req.NewPassword)
+	if err != nil {
+		if errors.Is(err, ErrInvalidPassword) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if errors.Is(err, ErrIncorrectPassword) {
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return
+		}
+		if errors.Is(err, ErrUserNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		http.Error(w, "failed to change password", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func setAuthCookies(
 	w http.ResponseWriter,
 	refreshToken string,
@@ -196,5 +249,25 @@ func setAuthCookies(
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   15 * 60,
+	})
+}
+
+// clearAuthCookies expires both auth cookies immediately.
+func clearAuthCookies(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    "",
+		Path:     "/auth",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   -1,
+	})
+	http.SetCookie(w, &http.Cookie{
+		Name:     "access_token",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   -1,
 	})
 }
