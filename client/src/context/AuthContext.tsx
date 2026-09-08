@@ -5,13 +5,18 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { getMe, login as apiLogin, logout as apiLogout, signup as apiSignup } from '@/api/auth'
-import type { User } from '@/api/auth'
-import { detectDeviceType } from '@/lib/device'
+import { toast } from 'sonner'
+import {
+  getMe,
+  login as apiLogin,
+  logout as apiLogout,
+  signup as apiSignup,
+  updateProfile as apiUpdateProfile,
+} from '@/api/auth'
+import type { User, UpdateProfilePayload } from '@/api/auth'
 
 // localStorage key — shared across all tabs of the same origin.
 // We store the email here (not the token — cookies handle that).
-// This lets other tabs pick up login/logout events via the `storage` event.
 const AUTH_EMAIL_KEY = 'taxmate_email'
 
 function writeAuthEmail(email: string) {
@@ -36,6 +41,8 @@ type AuthContextValue = {
   login: (email: string, password: string) => Promise<void>
   signup: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
+  refreshUser: () => Promise<void>
+  completeProfile: (payload: UpdateProfilePayload) => Promise<void>
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null)
@@ -43,16 +50,35 @@ export const AuthContext = createContext<AuthContextValue | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({ status: 'loading' })
 
-  // On mount (and when called from the storage listener), verify the session
-  // by hitting /me. The access_token cookie does the actual auth work.
-  // If the cookie is missing or expired, /me returns 401 → unauthenticated.
+  // Verify the session by hitting /me and build a full User from the response.
   const restoreSession = useCallback(async () => {
     try {
       const me = await getMe()
-      const email = readAuthEmail()
-      setState({ status: 'authenticated', user: { id: me.id, email } })
+      // /me now returns the full profile; email is also in localStorage as
+      // a cross-tab signal, but we trust the server response as source of truth.
+      const email = me.email || readAuthEmail()
+      setState({
+        status: 'authenticated',
+        user: { ...me, email },
+      })
     } catch {
-      // /me failed — no valid cookie. Clear any stale email too.
+      clearAuthEmail()
+      setState({ status: 'unauthenticated' })
+    }
+  }, [])
+
+  // Re-fetch the user from the server and update context in place.
+  // Called after completing onboarding so the profile_completed flag updates.
+  const refreshUser = useCallback(async () => {
+    try {
+      const me = await getMe()
+      const email = me.email || readAuthEmail()
+      setState((prev) => {
+        if (prev.status !== 'authenticated') return prev
+        return { status: 'authenticated', user: { ...me, email } }
+      })
+    } catch {
+      // If the cookie expired mid-onboarding, fall through gracefully.
       clearAuthEmail()
       setState({ status: 'unauthenticated' })
     }
@@ -64,30 +90,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [restoreSession])
 
   // Cross-tab sync via localStorage `storage` event.
-  //
-  // Scenario A — Tab A logs in, Tab B is on the login page idle:
-  //   Tab A writes AUTH_EMAIL_KEY → Tab B receives `storage` event →
-  //   Tab B calls restoreSession() → /me succeeds (shared cookie) →
-  //   Tab B becomes authenticated.
-  //
-  // Scenario B — Tab A logs out, Tab B is on dashboard:
-  //   Tab A removes AUTH_EMAIL_KEY → Tab B receives `storage` event →
-  //   Tab B calls restoreSession() → /me returns 401 (cookie cleared) →
-  //   Tab B becomes unauthenticated.
-  //
-  // Scenario C — Tab A signs up as user1, Tab B is signed up as user2 concurrently:
-  //   Last write wins on the cookie (server overwrites it). The tab whose
-  //   cookies were overwritten will call restoreSession and discover their
-  //   /me now returns the other user's id — they get re-synced to the current
-  //   cookie owner. This is the correct browser behavior: one origin = one
-  //   active session per device_type.
-  //
-  // Note: the `storage` event does NOT fire in the tab that made the change —
-  // only in other tabs. That's intentional browser behavior and is what we want.
   useEffect(() => {
     function onStorageChange(e: StorageEvent) {
       if (e.key !== AUTH_EMAIL_KEY) return
-      // Key was set (login/signup in another tab) or removed (logout in another tab).
       restoreSession()
     }
     window.addEventListener('storage', onStorageChange)
@@ -99,46 +104,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     function onForcedLogout() {
       clearAuthEmail()
       setState({ status: 'unauthenticated' })
+      // Show toast when logged out due to token refresh failure (likely another device login)
+      toast.info('Logged in from another device', {
+        description: 'Your session here was closed. Sign in again if needed.',
+        duration: 6000,
+      })
     }
     window.addEventListener('auth:logout', onForcedLogout)
     return () => window.removeEventListener('auth:logout', onForcedLogout)
   }, [])
 
   const login = useCallback(async (email: string, password: string) => {
-    const device_type = detectDeviceType()
-    const user = await apiLogin(email, password, device_type)
-    // Write to localStorage *after* the server sets the cookie — other tabs
-    // will pick this up via the `storage` event and call restoreSession.
-    writeAuthEmail(user.email)
-    setState({ status: 'authenticated', user })
-  }, [])
+    await apiLogin(email, password)
+    // After login, fetch the full profile (including profile_completed flag).
+    writeAuthEmail(email)
+    await restoreSession()
+  }, [restoreSession])
 
   const signup = useCallback(async (email: string, password: string) => {
-    const device_type = detectDeviceType()
-    // Signup creates the account but sets no cookies.
-    // Login immediately after to establish the session.
     await apiSignup(email, password)
-    const user = await apiLogin(email, password, device_type)
-    writeAuthEmail(user.email)
-    setState({ status: 'authenticated', user })
-  }, [])
+    await apiLogin(email, password)
+    writeAuthEmail(email)
+    await restoreSession()
+  }, [restoreSession])
 
   const logout = useCallback(async () => {
     try {
-      // Expire cookies on the server first.
       await apiLogout()
     } catch {
       // Server failure shouldn't block local cleanup.
     } finally {
-      // Removing the key triggers the `storage` event in other tabs,
-      // causing them to call restoreSession → /me → 401 → unauthenticated.
       clearAuthEmail()
       setState({ status: 'unauthenticated' })
     }
   }, [])
 
+  // Save profile data then refresh user in context so profile_completed flips.
+  const completeProfile = useCallback(async (payload: UpdateProfilePayload) => {
+    await apiUpdateProfile(payload)
+    await refreshUser()
+  }, [refreshUser])
+
   return (
-    <AuthContext.Provider value={{ state, login, signup, logout }}>
+    <AuthContext.Provider value={{ state, login, signup, logout, refreshUser, completeProfile }}>
       {children}
     </AuthContext.Provider>
   )

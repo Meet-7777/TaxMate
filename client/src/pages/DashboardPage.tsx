@@ -1,10 +1,11 @@
 import { motion } from 'framer-motion'
-import { LogOut, FileText, TrendingUp, Receipt, KeyRound, ChevronDown } from 'lucide-react'
+import { LogOut, FileText, TrendingUp, Receipt, KeyRound, ChevronDown, User } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { Card, CardContent, CardHeader, CardDescription } from '@/components/ui/card'
 import { TaxMateWordmark } from '@/components/TaxMateLogo'
+import { OnboardingPrompt } from '@/components/OnboardingPrompt'
 
 const stats = [
   { label: 'Tax Returns Filed', value: '—', icon: FileText, sub: 'This financial year' },
@@ -35,7 +36,7 @@ export default function DashboardPage() {
               className="flex items-center gap-2 text-sm text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors h-14 px-1"
             >
               <span className="max-w-[180px] truncate">
-                {user?.email || 'Account'}
+                {user?.first_name ? `${user.first_name} ${user.last_name ?? ''}`.trim() : user?.email ?? 'Account'}
               </span>
               <ChevronDown className="h-3.5 w-3.5 shrink-0" />
             </button>
@@ -45,6 +46,30 @@ export default function DashboardPage() {
                 {/* backdrop */}
                 <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
                 <div className="absolute right-0 top-full z-20 w-44 border border-[hsl(var(--border))] bg-[hsl(var(--card))] py-1">
+                  
+                  {!user?.profile_completed && (
+                    <>
+                      <Link
+                        to="/onboarding"
+                        onClick={() => setMenuOpen(false)}
+                        className="flex items-center gap-2 px-3 py-2 text-sm text-[#2C5F4E] hover:bg-[hsl(var(--muted))] transition-colors font-medium"
+                      >
+                        <User className="h-4 w-4" />
+                        Complete profile
+                      </Link>
+                      <div className="my-1 border-t border-[hsl(var(--border))]" />
+                    </>
+                  )}
+                  
+                  <Link
+                    to="/profile"
+                    onClick={() => setMenuOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 text-sm text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] transition-colors"
+                  >
+                    <User className="h-4 w-4 text-[hsl(var(--muted-foreground))]" />
+                    View profile
+                  </Link>
+                  
                   <Link
                     to="/change-password"
                     onClick={() => setMenuOpen(false)}
@@ -75,10 +100,15 @@ export default function DashboardPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.25, ease: 'easeOut' }}
         >
+          {/* Onboarding prompt — only show if profile incomplete */}
+          {!user?.profile_completed && (
+            <OnboardingPrompt firstName={user?.first_name} />
+          )}
+
           {/* Page heading */}
           <div className="mb-10">
             <h1 className="text-[30px] font-semibold leading-[38px] tracking-[-0.01em] text-[hsl(var(--foreground))]">
-              {user?.email ? `Good morning, ${user.email.split('@')[0]}` : 'Dashboard'}
+              {user?.first_name ? `Good morning, ${user.first_name}` : 'Dashboard'}
             </h1>
             <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
               Overview of your tax activity for the current financial year.

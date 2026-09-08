@@ -33,7 +33,7 @@ api.interceptors.response.use(
       error.response?.status === 401 &&
       original &&
       !original._retry &&
-      !original.url?.includes('/auth/refresh')
+      !original.url?.includes('/api/auth/refresh')
     ) {
       if (isRefreshing) {
         // Queue this request until the ongoing refresh completes.
@@ -52,7 +52,7 @@ api.interceptors.response.use(
       isRefreshing = true
 
       try {
-        await api.post('/auth/refresh')
+        await api.post('/api/auth/refresh')
         isRefreshing = false
         notifySubscribers(true)
         return api(original)

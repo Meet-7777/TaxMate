@@ -38,13 +38,13 @@ const steps = [
     n: '01',
     icon: Upload,
     title: 'Upload your documents',
-    body: 'Drop in your Uber tax summary, fuel receipts, phone bills, and any other expenses. No sorting, no spreadsheets.',
+    body: 'Income statements, receipts, invoices - whatever you\'ve got. No sorting, no spreadsheets.',
   },
   {
     n: '02',
     icon: ClipboardCheck,
     title: 'We handle the numbers',
-    body: 'Our team reviews your documents, calculates your GST, and prepares your BAS or tax return — accurately and on time.',
+    body: 'Our team reviews your documents, calculates GST if needed, and prepares your BAS or tax return - accurately and on time.',
   },
   {
     n: '03',
@@ -54,22 +54,13 @@ const steps = [
   },
 ]
 
-const included = [
-  '4 quarterly BAS lodgements',
-  'Annual income tax return',
-  'GST calculation on all fares',
-  'Expense & deduction tracking',
-  'ATO penalty reminders',
-  'Registered tax agent sign-off',
-]
-
 const forWho = [
-  'Uber & DiDi drivers',
-  'Uber Eats & DoorDash riders',
-  'Any rideshare or delivery driver',
-  'Tradies & sole traders',
+  'Rideshare & delivery drivers',
+  'Students working on ABN',
   'Freelancers & contractors',
-  'Anyone self-employed in Australia',
+  'Tradies & sole traders',
+  'Tutors & consultants',
+  'Anyone earning on ABN',
 ]
 
 // ─── LandingPage ─────────────────────────────────────────────────────────────
@@ -159,12 +150,12 @@ export default function LandingPage() {
               <p className="label-caps mb-4">What you'll need to upload</p>
               <div className="grid sm:grid-cols-2 gap-x-12 gap-y-2">
                 {[
-                  'Uber / DiDi annual tax summary',
-                  'Fuel receipts',
-                  'Vehicle registration',
+                  'Income statements / earnings summaries',
+                  'Fuel or vehicle expenses',
+                  'Equipment or tool purchases',
                   'Insurance',
-                  'Phone & data bills',
-                  'Any repair or maintenance invoices',
+                  'Phone & internet bills',
+                  'Any work-related receipts or invoices',
                 ].map((doc) => (
                   <div key={doc} className="flex items-center gap-2.5 text-sm text-[#6B6B6B]">
                     <div className="h-1.5 w-1.5 rounded-full bg-[#2C5F4E] shrink-0" />
@@ -186,34 +177,52 @@ export default function LandingPage() {
           <FadeUp>
             <p className="label-caps mb-3">Pricing</p>
             <h2 className="text-[clamp(1.75rem,3.5vw,2.5rem)] font-semibold tracking-[-0.025em] max-w-lg">
-              One flat price. Everything included.
+              Simple pricing. Choose what you need.
             </h2>
             <p className="mt-4 text-sm leading-relaxed text-[#6B6B6B] max-w-md">
-              Traditional accountants charge $800–$2,400 a year for the same work. We do it for $99.
+              Traditional accountants charge $800–$2,400 a year for the same work. We start from $59.
             </p>
           </FadeUp>
 
-          <div className="mt-12 grid sm:grid-cols-2 gap-px border border-[#E5E5E5]">
-            {/* Price card */}
+          <div className="mt-12 grid md:grid-cols-2 gap-6">
+            {/* Tax Only Tier */}
             <FadeUp>
-              <div className="bg-[#2C5F4E] p-10 h-full flex flex-col justify-between">
+              <div className="border border-[#E5E5E5] bg-white p-8 h-full flex flex-col">
                 <div>
-                  <p className="text-[#A8C9BD] text-sm font-medium uppercase tracking-widest">
-                    Full service
+                  <p className="text-[#6B6B6B] text-sm font-medium uppercase tracking-widest">
+                    Tax Return Only
                   </p>
                   <div className="mt-4 flex items-end gap-2">
-                    <span className="text-[3.5rem] font-semibold text-white leading-none tracking-[-0.04em]">
-                      $99
+                    <span className="text-[3rem] font-semibold text-[#1A1A1A] leading-none tracking-[-0.04em]">
+                      $59
                     </span>
-                    <span className="text-[#A8C9BD] text-sm pb-2">/ year</span>
+                    <span className="text-[#6B6B6B] text-sm pb-2">/ year</span>
                   </div>
-                  <p className="mt-2 text-[#A8C9BD] text-sm">
-                    That's $1.90 a week. Less than a coffee.
+                  <p className="mt-3 text-sm text-[#6B6B6B]">
+                    Perfect if you're not GST registered (under $75K turnover)
                   </p>
                 </div>
+                <ul className="mt-6 space-y-3 flex-1">
+                  <li className="flex items-start gap-3">
+                    <Check className="h-4 w-4 text-[#2C5F4E] shrink-0 mt-0.5" />
+                    <span className="text-sm text-[#1A1A1A]">Annual tax return lodgement</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <Check className="h-4 w-4 text-[#2C5F4E] shrink-0 mt-0.5" />
+                    <span className="text-sm text-[#1A1A1A]">Income & expense tracking</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <Check className="h-4 w-4 text-[#2C5F4E] shrink-0 mt-0.5" />
+                    <span className="text-sm text-[#1A1A1A]">Deduction calculations</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <Check className="h-4 w-4 text-[#2C5F4E] shrink-0 mt-0.5" />
+                    <span className="text-sm text-[#1A1A1A]">Registered tax agent sign-off</span>
+                  </li>
+                </ul>
                 <Link
                   to="/signup"
-                  className="mt-10 inline-flex items-center justify-center gap-2 bg-white text-[#2C5F4E] text-sm font-semibold px-6 py-3 hover:bg-[#F0F7F4] transition-colors"
+                  className="mt-8 inline-flex items-center justify-center gap-2 bg-[#2C5F4E] text-white text-sm font-semibold px-6 py-3 hover:bg-[#234438] transition-colors w-full"
                 >
                   Get started
                   <ArrowRight className="h-4 w-4" />
@@ -221,31 +230,62 @@ export default function LandingPage() {
               </div>
             </FadeUp>
 
-            {/* What's included */}
+            {/* Tax + BAS Tier */}
             <FadeUp delay={0.1}>
-              <div className="bg-white p-10 h-full">
-                <p className="text-sm font-semibold text-[#1A1A1A] mb-6">What's included</p>
-                <ul className="space-y-3">
-                  {included.map((item) => (
-                    <li key={item} className="flex items-start gap-3">
-                      <Check className="h-4 w-4 text-[#2C5F4E] shrink-0 mt-0.5" />
-                      <span className="text-sm text-[#1A1A1A]">{item}</span>
-                    </li>
-                  ))}
-                </ul>
-                <div className="mt-8 border-t border-[#E5E5E5] pt-6">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-[#6B6B6B]">Traditional accountant</span>
-                    <span className="font-medium text-[#B5482F] line-through">$800–$2,400/yr</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm mt-2">
-                    <span className="text-[#6B6B6B]">TaxMate</span>
-                    <span className="font-semibold text-[#2C5F4E]">$99/yr</span>
-                  </div>
+              <div className="border-2 border-[#2C5F4E] bg-white p-8 h-full flex flex-col relative">
+                <div className="absolute -top-3 left-8 bg-[#2C5F4E] text-white text-xs font-semibold px-3 py-1 uppercase tracking-wider">
+                  Most Popular
                 </div>
+                <div>
+                  <p className="text-[#6B6B6B] text-sm font-medium uppercase tracking-widest">
+                    Tax + BAS
+                  </p>
+                  <div className="mt-4 flex items-end gap-2">
+                    <span className="text-[3rem] font-semibold text-[#1A1A1A] leading-none tracking-[-0.04em]">
+                      $69
+                    </span>
+                    <span className="text-[#6B6B6B] text-sm pb-2">/ year</span>
+                  </div>
+                  <p className="mt-3 text-sm text-[#6B6B6B]">
+                    For GST-registered workers (rideshare, over $75K turnover)
+                  </p>
+                </div>
+                <ul className="mt-6 space-y-3 flex-1">
+                  <li className="flex items-start gap-3">
+                    <Check className="h-4 w-4 text-[#2C5F4E] shrink-0 mt-0.5" />
+                    <span className="text-sm text-[#1A1A1A] font-medium">Everything in Tax Only, plus:</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <Check className="h-4 w-4 text-[#2C5F4E] shrink-0 mt-0.5" />
+                    <span className="text-sm text-[#1A1A1A]">4 quarterly BAS lodgements</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <Check className="h-4 w-4 text-[#2C5F4E] shrink-0 mt-0.5" />
+                    <span className="text-sm text-[#1A1A1A]">GST calculations on all income</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <Check className="h-4 w-4 text-[#2C5F4E] shrink-0 mt-0.5" />
+                    <span className="text-sm text-[#1A1A1A]">ATO deadline reminders</span>
+                  </li>
+                </ul>
+                <Link
+                  to="/signup"
+                  className="mt-8 inline-flex items-center justify-center gap-2 bg-[#2C5F4E] text-white text-sm font-semibold px-6 py-3 hover:bg-[#234438] transition-colors w-full"
+                >
+                  Get started
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
               </div>
             </FadeUp>
           </div>
+
+          <FadeUp delay={0.15}>
+            <div className="mt-8 border-t border-[#E5E5E5] pt-6 text-center">
+              <p className="text-sm text-[#6B6B6B]">
+                Traditional accountants charge <span className="font-medium text-[#B5482F] line-through">$800–$2,400/yr</span> for the same service
+              </p>
+            </div>
+          </FadeUp>
 
           <FadeUp delay={0.15}>
             <p className="mt-5 text-xs text-[#9B9B9B] text-center">
@@ -262,13 +302,14 @@ export default function LandingPage() {
             <FadeUp>
               <p className="label-caps mb-3">Who it's for</p>
               <h2 className="text-[clamp(1.75rem,3.5vw,2.5rem)] font-semibold tracking-[-0.025em]">
-                Built for gig workers and sole traders.
+                Built for anyone earning on ABN.
               </h2>
               <p className="mt-5 text-sm leading-relaxed text-[#6B6B6B]">
-                If you drive for Uber, deliver for UberEats, or work any gig platform in Australia —
-                you're legally required to lodge a BAS every quarter and a tax return every year.
-                Most drivers either pay too much to an accountant or miss lodgements and cop ATO penalties.
-                TaxMate is neither.
+                If you work on ABN — whether you're driving for Uber, freelancing, tutoring students, 
+                or running a trade business — you're legally required to lodge a tax return every year. 
+                If you're GST registered (most rideshare drivers, or anyone over $75K turnover), you also 
+                need to lodge BAS quarterly. Most people either pay too much to an accountant or miss 
+                lodgements and cop ATO penalties. TaxMate is neither.
               </p>
               <div className="mt-6 border border-[#E5E5E5] bg-white p-5">
                 <p className="text-xs font-semibold text-[#B5482F] uppercase tracking-wider mb-2">
@@ -283,7 +324,7 @@ export default function LandingPage() {
                 to="/signup"
                 className="mt-8 inline-flex items-center gap-2 text-sm font-medium text-[#2C5F4E] hover:underline underline-offset-4 group"
               >
-                Get started for $99/year
+                Get started for from $59/year
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </Link>
             </FadeUp>
@@ -316,14 +357,14 @@ export default function LandingPage() {
             </h2>
             <p className="mt-4 text-sm text-[#6B6B6B] max-w-sm mx-auto">
               Upload your documents once. We handle every BAS and your annual return —
-              lodged by a registered tax agent, for $99 a year.
+              lodged by a registered tax agent, for $59 a year.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
               <Link
                 to="/signup"
                 className="group inline-flex items-center justify-center gap-2 bg-[#2C5F4E] text-white text-sm font-medium px-8 py-3.5 hover:bg-[#234d3e] transition-colors"
               >
-                Get started — $99/year
+                Get started — from $59/year
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </Link>
               <a
@@ -401,7 +442,7 @@ function HeroSection() {
         >
           <span className="h-1.5 w-1.5 rounded-full bg-[#2C5F4E]" />
           <span className="text-xs font-medium text-[#2C5F4E] tracking-wide">
-            For Uber, DiDi & delivery drivers in Australia
+            For anyone earning on ABN in Australia
           </span>
         </motion.div>
 
@@ -411,7 +452,7 @@ function HeroSection() {
           transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
           className="text-[clamp(2.75rem,6vw,4.5rem)] font-semibold leading-[1.07] tracking-[-0.03em]"
         >
-          Your BAS and tax return.
+          Your tax, sorted.
           <br />
           <span className="text-[#2C5F4E]">We lodge it for you.</span>
         </motion.h1>
@@ -422,8 +463,8 @@ function HeroSection() {
           transition={{ duration: 0.55, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
           className="mt-6 text-[1.0625rem] leading-relaxed text-[#6B6B6B] max-w-md"
         >
-          Upload your Uber summary and receipts. Our team calculates everything and a
-          registered Australian tax agent lodges with the ATO — every quarter, every year.
+          Upload your income statements and receipts. Our team calculates everything and a
+          registered Australian tax agent lodges with the ATO. BAS quarterly (if needed), tax return annually.
         </motion.p>
 
         <motion.div
@@ -436,7 +477,7 @@ function HeroSection() {
             to="/signup"
             className="group inline-flex items-center justify-center gap-2 bg-[#2C5F4E] text-white text-sm font-medium px-7 py-3.5 hover:bg-[#234d3e] transition-colors"
           >
-            Get started — $99/year
+            Get started — $59/year
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
           </Link>
           <a
@@ -456,12 +497,12 @@ function HeroSection() {
         >
           <span className="flex items-center gap-1.5">
             <Check className="h-3.5 w-3.5 text-[#2C5F4E]" />
-            4 BAS lodgements included
+            BAS + tax return from $69/yr
           </span>
           <span className="hidden sm:block text-[#E5E5E5]">|</span>
           <span className="flex items-center gap-1.5">
             <Check className="h-3.5 w-3.5 text-[#2C5F4E]" />
-            Annual tax return included
+            Tax return only from $59/yr
           </span>
           <span className="hidden sm:block text-[#E5E5E5]">|</span>
           <span className="flex items-center gap-1.5">
