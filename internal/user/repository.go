@@ -46,6 +46,7 @@ func (r *Repository) Create(ctx context.Context, email string, passwordHash stri
 			phone_number,
 			email_verified,
 			phone_verified`, uuid.New(), email, passwordHash).Scan(&u.ID, &u.Email, &u.PasswordHash, &u.PhoneNumber, &u.EmailVerified, &u.PhoneVerified)
+
 	return u, err
 }
 

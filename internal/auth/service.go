@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"time"
 
@@ -18,6 +19,7 @@ var ErrInvalidPassword = errors.New("password must be at least 8 characters")
 var ErrEmailAlreadyExists = errors.New("email already exists")
 var ErrInvalidCredentials = errors.New("invalid credentials")
 var ErrInvalidRefreshToken = errors.New("invalid refresh token")
+var ErrInvalidDeviceType = errors.New("invalid device type")
 
 type Service struct {
 	users       user.UserRepository
@@ -70,35 +72,51 @@ func (s *Service) Signup(
 }
 
 func (s *Service) Login(
-	ctx context.Context, email string, password string) (LoginResult, error) {
+	ctx context.Context,
+	email string,
+	password string,
+	deviceType session.DeviceType,
+) (LoginResult, error) {
+	if !session.IsValidDeviceType(deviceType) {
+		return LoginResult{}, ErrInvalidDeviceType
+	}
+
 	u, err := s.users.FindByEmail(ctx, email)
 	if err != nil {
 		return LoginResult{}, ErrInvalidCredentials
 	}
+
 	if !crypto.VerifyPassword(password, u.PasswordHash) {
 		return LoginResult{}, ErrInvalidCredentials
 	}
+
 	refreshToken, err := crypto.GenerateToken()
 	if err != nil {
 		return LoginResult{}, err
 	}
+
 	accessToken, err := token.CreateAccessToken(u.ID)
 	if err != nil {
 		return LoginResult{}, err
 	}
+
 	sessionID := uuid.New()
+	now := time.Now()
 
 	newSession := &session.Session{
 		ID:               sessionID,
 		UserID:           u.ID,
 		RefreshTokenHash: crypto.HashToken(refreshToken),
 		FamilyID:         sessionID,
-		ExpiresAt:        time.Now().Add(7 * 24 * time.Hour),
-		CreatedAt:        time.Now(),
+		DeviceType:       deviceType,
+		ExpiresAt:        now.Add(7 * 24 * time.Hour),
+		CreatedAt:        now,
 	}
+
 	if err := s.session.Create(ctx, newSession); err != nil {
 		return LoginResult{}, err
 	}
+
 	return LoginResult{
 		User:         u,
 		RefreshToken: refreshToken,
@@ -153,6 +171,7 @@ func (s *Service) Refresh(
 		UserID:           currentSession.UserID,
 		RefreshTokenHash: crypto.HashToken(newRefreshToken),
 		FamilyID:         currentSession.FamilyID,
+		DeviceType:       currentSession.DeviceType,
 		ExpiresAt:        currentSession.ExpiresAt,
 		CreatedAt:        time.Now(),
 	}
@@ -162,6 +181,7 @@ func (s *Service) Refresh(
 		currentSession.ID,
 		newSession,
 	); err != nil {
+		fmt.Printf("ROTATE ERROR: %v\n", err)
 		return LoginResult{}, ErrInvalidRefreshToken
 	}
 

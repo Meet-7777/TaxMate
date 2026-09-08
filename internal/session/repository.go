@@ -9,10 +9,13 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+var ErrSessionAlreadyRotated = errors.New("session already rotated")
+
 type Repository interface {
 	Create(ctx context.Context, s *Session) error
 	FindByRefreshTokenHash(ctx context.Context, refreshTokenHash string) (*Session, error)
 	Rotate(ctx context.Context, oldSessionID uuid.UUID, newSession *Session) error
+	RevokeFamily(ctx context.Context, familyID uuid.UUID) error
 }
 
 type PostgresRepository struct {
@@ -25,30 +28,61 @@ func NewRepository(db *pgxpool.Pool) *PostgresRepository {
 	}
 }
 
-func (r *PostgresRepository) Create(ctx context.Context, s *Session) error {
-	_, err := r.db.Exec(ctx, `
+func (r *PostgresRepository) Create(
+	ctx context.Context,
+	s *Session,
+) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	_, err = tx.Exec(ctx, `
+		UPDATE sessions
+		SET revoked_at = NOW()
+		WHERE user_id = $1
+		  AND device_type = $2
+		  AND revoked_at IS NULL
+	`,
+		s.UserID,
+		s.DeviceType,
+	)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(ctx, `
 		INSERT INTO sessions (
 			id,
 			user_id,
 			refresh_token_hash,
 			family_id,
+			device_type,
 			expires_at,
 			created_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`,
 		s.ID,
 		s.UserID,
 		s.RefreshTokenHash,
 		s.FamilyID,
+		s.DeviceType,
 		s.ExpiresAt,
 		s.CreatedAt,
 	)
+	if err != nil {
+		return err
+	}
 
-	return err
+	return tx.Commit(ctx)
 }
 
-func (r *PostgresRepository) FindByRefreshTokenHash(ctx context.Context, refreshTokenHash string) (*Session, error) {
+func (r *PostgresRepository) FindByRefreshTokenHash(
+	ctx context.Context,
+	refreshTokenHash string,
+) (*Session, error) {
 	var s Session
 
 	err := r.db.QueryRow(ctx, `
@@ -57,6 +91,7 @@ func (r *PostgresRepository) FindByRefreshTokenHash(ctx context.Context, refresh
 			user_id,
 			refresh_token_hash,
 			family_id,
+			device_type,
 			expires_at,
 			created_at,
 			replaced_by,
@@ -64,11 +99,14 @@ func (r *PostgresRepository) FindByRefreshTokenHash(ctx context.Context, refresh
 			revoked_at
 		FROM sessions
 		WHERE refresh_token_hash = $1
-	`, refreshTokenHash).Scan(
+	`,
+		refreshTokenHash,
+	).Scan(
 		&s.ID,
 		&s.UserID,
 		&s.RefreshTokenHash,
 		&s.FamilyID,
+		&s.DeviceType,
 		&s.ExpiresAt,
 		&s.CreatedAt,
 		&s.ReplacedBy,
@@ -102,14 +140,19 @@ func (r *PostgresRepository) Rotate(
 		FROM sessions
 		WHERE id = $1
 		FOR UPDATE
-	`, oldSessionID).Scan(&revokedAt, &replacedBy)
+	`,
+		oldSessionID,
+	).Scan(
+		&revokedAt,
+		&replacedBy,
+	)
 
 	if err != nil {
 		return err
 	}
 
 	if revokedAt != nil || replacedBy != nil {
-		return errors.New("session already rotated")
+		return ErrSessionAlreadyRotated
 	}
 
 	now := time.Now()
@@ -126,7 +169,6 @@ func (r *PostgresRepository) Rotate(
 		newSession.ID,
 		oldSessionID,
 	)
-
 	if err != nil {
 		return err
 	}
@@ -137,22 +179,39 @@ func (r *PostgresRepository) Rotate(
 			user_id,
 			refresh_token_hash,
 			family_id,
+			device_type,
 			expires_at,
 			created_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`,
 		newSession.ID,
 		newSession.UserID,
 		newSession.RefreshTokenHash,
 		newSession.FamilyID,
+		newSession.DeviceType,
 		newSession.ExpiresAt,
 		newSession.CreatedAt,
 	)
-
 	if err != nil {
 		return err
 	}
 
 	return tx.Commit(ctx)
+}
+
+func (r *PostgresRepository) RevokeFamily(
+	ctx context.Context,
+	familyID uuid.UUID,
+) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE sessions
+		SET revoked_at = COALESCE(revoked_at, NOW())
+		WHERE family_id = $1
+		  AND revoked_at IS NULL
+	`,
+		familyID,
+	)
+
+	return err
 }

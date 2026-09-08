@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/Meet-7777/taxmate-server/internal/middleware"
+	"github.com/Meet-7777/taxmate-server/internal/session"
 )
 
 type Handler struct {
@@ -24,8 +25,9 @@ type SignupRequest struct {
 }
 
 type LoginRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email      string `json:"email"`
+	Password   string `json:"password"`
+	DeviceType string `json:"device_type"`
 }
 
 func (h *Handler) Signup(w http.ResponseWriter, r *http.Request) {
@@ -48,7 +50,6 @@ func (h *Handler) Signup(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if err != nil {
-
 		if errors.Is(err, ErrInvalidPassword) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -75,12 +76,24 @@ func (h *Handler) Signup(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	var req LoginRequest
+
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
 	}
-	u, err := h.service.Login(
-		r.Context(), req.Email, req.Password,
+
+	deviceType := session.DeviceType(req.DeviceType)
+
+	if !session.IsValidDeviceType(deviceType) {
+		http.Error(w, "invalid device type", http.StatusBadRequest)
+		return
+	}
+
+	result, err := h.service.Login(
+		r.Context(),
+		req.Email,
+		req.Password,
+		deviceType,
 	)
 	if err != nil {
 		if errors.Is(err, ErrInvalidCredentials) {
@@ -88,31 +101,22 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		if errors.Is(err, ErrInvalidDeviceType) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
 		http.Error(w, "failed to login", http.StatusInternalServerError)
 		return
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     "refresh_token",
-		Value:    u.RefreshToken,
-		Path:     "/",
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   7 * 24 * 60 * 60,
-	})
-	http.SetCookie(w, &http.Cookie{
-		Name:     "access_token",
-		Value:    u.AccessToken,
-		Path:     "/",
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   15 * 60,
-	})
+	setAuthCookies(w, result.RefreshToken, result.AccessToken)
 
 	response := map[string]string{
-		"id":    u.User.ID.String(),
-		"email": u.User.Email,
+		"id":    result.User.ID.String(),
+		"email": result.User.Email,
 	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
@@ -151,23 +155,7 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     "refresh_token",
-		Value:    result.RefreshToken,
-		Path:     "/",
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   7 * 24 * 60 * 60,
-	})
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     "access_token",
-		Value:    result.AccessToken,
-		Path:     "/",
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   15 * 60,
-	})
+	setAuthCookies(w, result.RefreshToken, result.AccessToken)
 
 	w.WriteHeader(http.StatusOK)
 }
@@ -185,4 +173,28 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
+}
+
+func setAuthCookies(
+	w http.ResponseWriter,
+	refreshToken string,
+	accessToken string,
+) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    refreshToken,
+		Path:     "/auth",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   7 * 24 * 60 * 60,
+	})
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "access_token",
+		Value:    accessToken,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   15 * 60,
+	})
 }
