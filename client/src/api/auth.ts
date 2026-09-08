@@ -39,6 +39,21 @@ export async function refresh(): Promise<void> {
   await api.post('/auth/refresh')
 }
 
+// POST /auth/logout
+// Expires both auth cookies on the server. Always call this before clearing local state.
+export async function logout(): Promise<void> {
+  await api.post('/auth/logout')
+}
+
+// POST /auth/change-password (protected)
+// Verifies old password, then replaces with new password.
+export async function changePassword(
+  old_password: string,
+  new_password: string,
+): Promise<void> {
+  await api.post('/auth/change-password', { old_password, new_password })
+}
+
 // GET /me
 // Returns the current user's id from the access_token cookie.
 export async function getMe(): Promise<MeResponse> {

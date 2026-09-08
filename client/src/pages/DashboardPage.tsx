@@ -1,111 +1,137 @@
 import { motion } from 'framer-motion'
-import { LogOut, User, FileText, TrendingUp, Receipt } from 'lucide-react'
+import { LogOut, FileText, TrendingUp, Receipt, KeyRound, ChevronDown } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardDescription } from '@/components/ui/card'
 
 const stats = [
-  { label: 'Total Filed', value: '—', icon: FileText, description: 'Tax returns filed' },
-  { label: 'Savings Found', value: '—', icon: TrendingUp, description: 'Deductions identified' },
-  { label: 'Pending Items', value: '—', icon: Receipt, description: 'Awaiting review' },
+  { label: 'Tax Returns Filed', value: '—', icon: FileText, sub: 'This financial year' },
+  { label: 'Deductions Found', value: '—', icon: TrendingUp, sub: 'Across all categories' },
+  { label: 'Pending Items', value: '—', icon: Receipt, sub: 'Awaiting your review' },
 ]
 
 export default function DashboardPage() {
   const { state, logout } = useAuth()
   const user = state.status === 'authenticated' ? state.user : null
+  const [menuOpen, setMenuOpen] = useState(false)
 
   return (
     <div className="min-h-screen bg-[hsl(var(--background))]">
-      {/* Nav */}
+
+      {/* ── Top navigation ── */}
       <header className="border-b border-[hsl(var(--border))] bg-[hsl(var(--card))]">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-2">
-            <div className="h-7 w-7 rounded-lg bg-[hsl(var(--primary))] flex items-center justify-center">
-              <span className="text-[hsl(var(--primary-foreground))] text-xs font-bold">T</span>
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-0 h-14">
+          {/* Logo */}
+          <div className="flex items-center gap-2.5">
+            <div
+              className="h-7 w-7 flex items-center justify-center shrink-0"
+              style={{ backgroundColor: '#2C5F4E' }}
+            >
+              <span className="text-white text-xs font-bold">T</span>
             </div>
-            <span className="font-semibold tracking-tight">TaxMate</span>
+            <span className="text-sm font-semibold tracking-tight">TaxMate</span>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 rounded-full border border-[hsl(var(--border))] px-3 py-1.5 text-sm">
-              <User className="h-3.5 w-3.5 text-[hsl(var(--muted-foreground))]" />
-              <span className="text-[hsl(var(--muted-foreground))]">
-                {user?.email || user?.id || 'Account'}
-              </span>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={logout}
-              className="gap-1.5 text-[hsl(var(--muted-foreground))]"
+          {/* Account menu */}
+          <div className="relative">
+            <button
+              onClick={() => setMenuOpen((v) => !v)}
+              className="flex items-center gap-2 text-sm text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors h-14 px-1"
             >
-              <LogOut className="h-4 w-4" />
-              Sign out
-            </Button>
+              <span className="max-w-[180px] truncate">
+                {user?.email || 'Account'}
+              </span>
+              <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+            </button>
+
+            {menuOpen && (
+              <>
+                {/* backdrop */}
+                <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+                <div className="absolute right-0 top-full z-20 w-44 border border-[hsl(var(--border))] bg-[hsl(var(--card))] py-1">
+                  <Link
+                    to="/change-password"
+                    onClick={() => setMenuOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 text-sm text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] transition-colors"
+                  >
+                    <KeyRound className="h-4 w-4 text-[hsl(var(--muted-foreground))]" />
+                    Change password
+                  </Link>
+                  <div className="my-1 border-t border-[hsl(var(--border))]" />
+                  <button
+                    onClick={() => { setMenuOpen(false); logout() }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] transition-colors"
+                  >
+                    <LogOut className="h-4 w-4 text-[hsl(var(--muted-foreground))]" />
+                    Sign out
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-4 py-10">
+      {/* ── Main content ── */}
+      <main className="mx-auto max-w-5xl px-6 py-10">
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, ease: 'easeOut' }}
+          transition={{ duration: 0.25, ease: 'easeOut' }}
         >
-          {/* Welcome */}
-          <div className="mb-8">
-            <h1 className="text-2xl font-bold tracking-tight">
-              Welcome{user?.email ? `, ${user.email.split('@')[0]}` : ''}
+          {/* Page heading */}
+          <div className="mb-10">
+            <h1 className="text-[30px] font-semibold leading-[38px] tracking-[-0.01em] text-[hsl(var(--foreground))]">
+              {user?.email ? `Good morning, ${user.email.split('@')[0]}` : 'Dashboard'}
             </h1>
-            <p className="mt-1 text-[hsl(var(--muted-foreground))]">
-              Here's an overview of your tax activity.
+            <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
+              Overview of your tax activity for the current financial year.
             </p>
           </div>
 
-          {/* Stats */}
-          <div className="grid gap-4 sm:grid-cols-3 mb-8">
+          {/* Stat cards */}
+          <div className="grid gap-px sm:grid-cols-3 mb-10 border border-[hsl(var(--border))]">
             {stats.map((stat, i) => {
               const Icon = stat.icon
               return (
                 <motion.div
                   key={stat.label}
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.25, delay: i * 0.07 }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.2, delay: i * 0.06 }}
+                  className="bg-[hsl(var(--card))] p-6"
                 >
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <div className="flex items-center justify-between">
-                        <CardDescription>{stat.label}</CardDescription>
-                        <Icon className="h-4 w-4 text-[hsl(var(--muted-foreground))]" />
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-2xl font-bold">{stat.value}</p>
-                      <p className="text-xs text-[hsl(var(--muted-foreground))] mt-0.5">
-                        {stat.description}
-                      </p>
-                    </CardContent>
-                  </Card>
+                  <div className="flex items-start justify-between mb-3">
+                    <p className="label-caps">{stat.label}</p>
+                    <Icon className="h-4 w-4 text-[hsl(var(--muted-foreground))] mt-0.5" />
+                  </div>
+                  <p className="mono-data text-[28px] font-semibold text-[hsl(var(--foreground))]">
+                    {stat.value}
+                  </p>
+                  <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">{stat.sub}</p>
                 </motion.div>
               )
             })}
           </div>
 
-          {/* Placeholder content */}
+          {/* Recent activity */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Recent Activity</CardTitle>
+            <CardHeader className="border-b border-[hsl(var(--border))] pb-4">
+              <p className="label-caps">Recent Activity</p>
               <CardDescription>Your latest tax events will appear here.</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <div className="rounded-full bg-[hsl(var(--muted))] p-4 mb-4">
-                  <FileText className="h-6 w-6 text-[hsl(var(--muted-foreground))]" />
+            <CardContent className="pt-0">
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <div
+                  className="flex h-12 w-12 items-center justify-center mb-4"
+                  style={{ backgroundColor: 'hsl(var(--muted))' }}
+                >
+                  <FileText className="h-5 w-5 text-[hsl(var(--muted-foreground))]" />
                 </div>
-                <p className="font-medium text-sm">No activity yet</p>
-                <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
-                  Start by adding your first tax document.
+                <p className="text-sm font-medium text-[hsl(var(--foreground))]">No activity yet</p>
+                <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1 max-w-xs">
+                  Your transactions, receipts, and filed returns will appear here once you start adding documents.
                 </p>
               </div>
             </CardContent>
