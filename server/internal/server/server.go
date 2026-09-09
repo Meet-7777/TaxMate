@@ -23,10 +23,17 @@ func New(db *pgxpool.Pool, redis *redis.Client) *chi.Mux {
 	authService := auth.NewService(userRepo, sessionRepo)
 	authHandler := auth.NewHandler(authService)
 
-	router.Post("/auth/signup", authHandler.Signup)
-	router.Post("/auth/login", authHandler.Login)
-	router.Post("/auth/refresh", authHandler.Refresh)
+	// API routes under /api prefix
+	router.Route("/api", func(r chi.Router) {
+		r.Post("/auth/signup", authHandler.Signup)
+		r.Post("/auth/login", authHandler.Login)
+		r.Post("/auth/refresh", authHandler.Refresh)
+		r.Post("/auth/logout", authHandler.Logout)
 
-	router.With(middleware.Auth).Get("/me", authHandler.Me)
+		r.With(middleware.Auth(sessionRepo)).Get("/me", authHandler.Me)
+		r.With(middleware.Auth(sessionRepo)).Patch("/me/profile", authHandler.UpdateProfile)
+		r.With(middleware.Auth(sessionRepo)).Post("/auth/change-password", authHandler.ChangePassword)
+	})
+
 	return router
 }

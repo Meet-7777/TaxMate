@@ -16,6 +16,7 @@ type Repository interface {
 	FindByRefreshTokenHash(ctx context.Context, refreshTokenHash string) (*Session, error)
 	Rotate(ctx context.Context, oldSessionID uuid.UUID, newSession *Session) error
 	RevokeFamily(ctx context.Context, familyID uuid.UUID) error
+	IsSessionActive(ctx context.Context, sessionID uuid.UUID) (bool, error)
 }
 
 type PostgresRepository struct {
@@ -214,4 +215,26 @@ func (r *PostgresRepository) RevokeFamily(
 	)
 
 	return err
+}
+
+func (r *PostgresRepository) IsSessionActive(
+	ctx context.Context,
+	sessionID uuid.UUID,
+) (bool, error) {
+	var revokedAt *time.Time
+
+	err := r.db.QueryRow(ctx, `
+		SELECT revoked_at
+		FROM sessions
+		WHERE id = $1
+		  AND expires_at > NOW()
+	`,
+		sessionID,
+	).Scan(&revokedAt)
+
+	if err != nil {
+		return false, nil // Session not found = not active
+	}
+
+	return revokedAt == nil, nil
 }

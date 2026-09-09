@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"time"
 
@@ -20,6 +19,9 @@ var ErrEmailAlreadyExists = errors.New("email already exists")
 var ErrInvalidCredentials = errors.New("invalid credentials")
 var ErrInvalidRefreshToken = errors.New("invalid refresh token")
 var ErrInvalidDeviceType = errors.New("invalid device type")
+var ErrIncorrectPassword = errors.New("current password is incorrect")
+var ErrUserNotFound = errors.New("user not found")
+var ErrInvalidWorkType = errors.New("invalid work_type: must be one of uber, didi, ubereats, doordash, menulog, casual_employee, freelancer, tradie, other")
 
 type Service struct {
 	users       user.UserRepository
@@ -95,13 +97,13 @@ func (s *Service) Login(
 		return LoginResult{}, err
 	}
 
-	accessToken, err := token.CreateAccessToken(u.ID)
+	sessionID := uuid.New()
+	now := time.Now()
+
+	accessToken, err := token.CreateAccessToken(u.ID, sessionID)
 	if err != nil {
 		return LoginResult{}, err
 	}
-
-	sessionID := uuid.New()
-	now := time.Now()
 
 	newSession := &session.Session{
 		ID:               sessionID,
@@ -161,13 +163,14 @@ func (s *Service) Refresh(
 		return LoginResult{}, err
 	}
 
-	newAccessToken, err := token.CreateAccessToken(currentSession.UserID)
+	newSessionID := uuid.New()
+	newAccessToken, err := token.CreateAccessToken(currentSession.UserID, newSessionID)
 	if err != nil {
 		return LoginResult{}, err
 	}
 
 	newSession := &session.Session{
-		ID:               uuid.New(),
+		ID:               newSessionID,
 		UserID:           currentSession.UserID,
 		RefreshTokenHash: crypto.HashToken(newRefreshToken),
 		FamilyID:         currentSession.FamilyID,
@@ -181,7 +184,6 @@ func (s *Service) Refresh(
 		currentSession.ID,
 		newSession,
 	); err != nil {
-		fmt.Printf("ROTATE ERROR: %v\n", err)
 		return LoginResult{}, ErrInvalidRefreshToken
 	}
 
@@ -199,4 +201,66 @@ func (s *Service) Refresh(
 		RefreshToken: newRefreshToken,
 		AccessToken:  newAccessToken,
 	}, nil
+}
+
+// GetProfile fetches the full user record by ID.
+func (s *Service) GetProfile(ctx context.Context, userID uuid.UUID) (user.User, error) {
+	u, err := s.users.FindByID(ctx, userID)
+	if err != nil {
+		return user.User{}, ErrUserNotFound
+	}
+	return u, nil
+}
+
+// UpdateProfile validates and persists the user's onboarding data.
+func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, data user.ProfileData) (user.User, error) {
+	validWorkTypes := map[user.WorkType]bool{
+		user.WorkTypeUber:           true,
+		user.WorkTypeDiDi:           true,
+		user.WorkTypeUberEats:       true,
+		user.WorkTypeDoorDash:       true,
+		user.WorkTypeMenulog:        true,
+		user.WorkTypeCasualEmployee: true,
+		user.WorkTypeFreelancer:     true,
+		user.WorkTypeTradie:         true,
+		user.WorkTypeOther:          true,
+	}
+	if !validWorkTypes[data.WorkType] {
+		return user.User{}, ErrInvalidWorkType
+	}
+
+	u, err := s.users.UpdateProfile(ctx, userID, data)
+	if err != nil {
+		return user.User{}, err
+	}
+	return u, nil
+}
+
+// ChangePassword verifies the user's current password then replaces it.
+// userID comes from the JWT claim via middleware — no email lookup needed.
+func (s *Service) ChangePassword(
+	ctx context.Context,
+	userID uuid.UUID,
+	oldPassword string,
+	newPassword string,
+) error {
+	if len(newPassword) < 8 {
+		return ErrInvalidPassword
+	}
+
+	u, err := s.users.FindByID(ctx, userID)
+	if err != nil {
+		return ErrUserNotFound
+	}
+
+	if !crypto.VerifyPassword(oldPassword, u.PasswordHash) {
+		return ErrIncorrectPassword
+	}
+
+	newHash, err := crypto.HashPassword(newPassword)
+	if err != nil {
+		return err
+	}
+
+	return s.users.UpdatePassword(ctx, userID, newHash)
 }

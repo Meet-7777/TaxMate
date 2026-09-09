@@ -13,6 +13,13 @@ const stats = [
   { label: 'Pending Items', value: '—', icon: Receipt, sub: 'Awaiting your review' },
 ]
 
+function getGreeting() {
+  const hour = new Date().getHours()
+  if (hour < 12) return 'Good morning'
+  if (hour < 18) return 'Good afternoon'
+  return 'Good evening'
+}
+
 export default function DashboardPage() {
   const { state, logout } = useAuth()
   const user = state.status === 'authenticated' ? state.user : null
@@ -108,7 +115,7 @@ export default function DashboardPage() {
           {/* Page heading */}
           <div className="mb-10">
             <h1 className="text-[30px] font-semibold leading-[38px] tracking-[-0.01em] text-[hsl(var(--foreground))]">
-              {user?.first_name ? `Good morning, ${user.first_name}` : 'Dashboard'}
+              {user?.first_name ? `${getGreeting()}, ${user.first_name}` : 'Dashboard'}
             </h1>
             <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
               Overview of your tax activity for the current financial year.

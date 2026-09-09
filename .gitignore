@@ -1,7 +1,46 @@
+# Environment files
 .env
+.env.local
+.env*.local
 
+# Server-specific environment
+server/.env
+
+# Build outputs
 bin/
+main
+api
+dist/
+build/
+server/bin/
+server/main
+server/api
 
+# Logs
 *.log
+logs/
 
+# OS files
 .DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Dependencies
+node_modules/
+client/node_modules/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Coverage reports
+coverage/
+*.coverprofile
+coverage.out
