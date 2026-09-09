@@ -47,7 +47,13 @@ export default function SignupPage() {
     setServerError('')
     try {
       await signup(values.email, values.password)
-      navigate('/dashboard')
+      // Navigate to login with success message
+      navigate('/login', { 
+        state: { 
+          message: "Account created! Please sign in with your new credentials.",
+          email: values.email 
+        } 
+      })
     } catch (err) {
       if (axios.isAxiosError(err)) {
         const msg = err.response?.data

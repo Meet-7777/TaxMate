@@ -123,10 +123,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signup = useCallback(async (email: string, password: string) => {
     await apiSignup(email, password)
-    await apiLogin(email, password)
-    writeAuthEmail(email)
-    await restoreSession()
-  }, [restoreSession])
+    // Don't auto-login after signup - let user login manually
+  }, [])
 
   const logout = useCallback(async () => {
     try {

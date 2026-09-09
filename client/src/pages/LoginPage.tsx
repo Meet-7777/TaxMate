@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Link, useNavigate, Navigate } from 'react-router-dom'
+import { Link, useNavigate, Navigate, useLocation } from 'react-router-dom'
 import { motion, type Variants } from 'framer-motion'
 import { Eye, EyeOff, ArrowRight } from 'lucide-react'
 import { loginSchema, type LoginFormValues } from '@/lib/schemas'
@@ -29,14 +29,30 @@ const item: Variants = {
 export default function LoginPage() {
   const { login, state } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [serverError, setServerError] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+
+  // Check for success message from signup
+  useEffect(() => {
+    if (location.state?.message) {
+      setSuccessMessage(location.state.message)
+      // Clear the message from location state
+      window.history.replaceState({}, document.title)
+    }
+  }, [location.state])
 
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<LoginFormValues>({ resolver: zodResolver(loginSchema) })
+  } = useForm<LoginFormValues>({ 
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: location.state?.email || ''
+    }
+  })
 
   if (state.status === 'authenticated') {
     return <Navigate to="/dashboard" replace />
@@ -44,6 +60,7 @@ export default function LoginPage() {
 
   async function onSubmit(values: LoginFormValues) {
     setServerError('')
+    setSuccessMessage('') // Clear success message on login attempt
     try {
       await login(values.email, values.password)
       navigate('/dashboard')
@@ -146,6 +163,15 @@ export default function LoginPage() {
             <motion.div variants={item}>
               <FormError message={serverError} />
             </motion.div>
+
+            {/* Success message from signup */}
+            {successMessage && (
+              <motion.div variants={item}>
+                <div className="rounded-lg border border-[#2C5F4E]/20 bg-[#2C5F4E]/5 px-4 py-3">
+                  <p className="text-sm text-[#2C5F4E] font-medium">{successMessage}</p>
+                </div>
+              </motion.div>
+            )}
 
             <motion.div variants={item} className="space-y-1.5">
               <Label htmlFor="email">Email address</Label>
