@@ -28,7 +28,7 @@ export default function ProfilePage() {
 
   const [errors, setErrors] = useState<Partial<Record<keyof UpdateProfilePayload, string>>>({})
 
-  // Load user data when available
+  
   useEffect(() => {
     if (state.status === 'authenticated' && state.user) {
       setFormData({
@@ -83,7 +83,7 @@ export default function ProfilePage() {
     try {
       await completeProfile({
         ...formData,
-        abn: formData.abn.replace(/\s/g, ''), // Remove spaces from ABN
+        abn: formData.abn.replace(/\s/g, ''), 
       })
       setIsEditing(false)
     } catch (err: any) {
@@ -138,7 +138,7 @@ export default function ProfilePage() {
           </CardHeader>
           <CardContent>
             {!isEditing && user.profile_completed ? (
-              // View mode
+              
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -183,7 +183,7 @@ export default function ProfilePage() {
                 </div>
               </div>
             ) : (
-              // Edit mode
+              
               <form onSubmit={handleSubmit} className="space-y-4">
                 {error && <FormError message={error} />}
 
@@ -291,7 +291,7 @@ export default function ProfilePage() {
                         setIsEditing(false)
                         setError('')
                         setErrors({})
-                        // Reset form to user data
+                        
                         setFormData({
                           first_name: user.first_name || '',
                           last_name: user.last_name || '',

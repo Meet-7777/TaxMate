@@ -27,7 +27,6 @@ func Auth(sessionRepo session.Repository) func(http.Handler) http.Handler {
 				return
 			}
 
-			// Check if THIS specific session is still active (not revoked)
 			isActive, err := sessionRepo.IsSessionActive(r.Context(), claims.SessionID)
 			if err != nil || !isActive {
 				http.Error(w, "session revoked", http.StatusUnauthorized)

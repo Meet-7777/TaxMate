@@ -233,7 +233,7 @@ func (r *PostgresRepository) IsSessionActive(
 	).Scan(&revokedAt)
 
 	if err != nil {
-		return false, nil // Session not found = not active
+		return false, nil
 	}
 
 	return revokedAt == nil, nil

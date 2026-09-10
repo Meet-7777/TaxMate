@@ -80,6 +80,7 @@ func (s *Service) Login(
 	password string,
 	deviceType session.DeviceType,
 ) (LoginResult, error) {
+
 	if !session.IsValidDeviceType(deviceType) {
 		return LoginResult{}, ErrInvalidDeviceType
 	}
@@ -101,7 +102,10 @@ func (s *Service) Login(
 	sessionID := uuid.New()
 	now := time.Now()
 
-	accessToken, err := token.CreateAccessToken(u.ID, sessionID)
+	accessToken, err := token.CreateAccessToken(
+		u.ID,
+		sessionID,
+	)
 	if err != nil {
 		return LoginResult{}, err
 	}
@@ -112,8 +116,11 @@ func (s *Service) Login(
 		RefreshTokenHash: crypto.HashToken(refreshToken),
 		FamilyID:         sessionID,
 		DeviceType:       deviceType,
-		ExpiresAt:        now.Add(7 * 24 * time.Hour),
-		CreatedAt:        now,
+
+		// Refresh token/session expires 7 days after login.
+		ExpiresAt: now.Add(7 * 24 * time.Hour),
+
+		CreatedAt: now,
 	}
 
 	if err := s.session.Create(ctx, newSession); err != nil {
@@ -131,6 +138,7 @@ func (s *Service) Refresh(
 	ctx context.Context,
 	refreshToken string,
 ) (LoginResult, error) {
+
 	refreshTokenHash := crypto.HashToken(refreshToken)
 
 	unlock := s.coordinator.Lock(refreshTokenHash)
@@ -155,7 +163,9 @@ func (s *Service) Refresh(
 		return LoginResult{}, ErrInvalidRefreshToken
 	}
 
-	if time.Now().After(currentSession.ExpiresAt) {
+	now := time.Now()
+
+	if now.After(currentSession.ExpiresAt) {
 		return LoginResult{}, ErrInvalidRefreshToken
 	}
 
@@ -165,7 +175,11 @@ func (s *Service) Refresh(
 	}
 
 	newSessionID := uuid.New()
-	newAccessToken, err := token.CreateAccessToken(currentSession.UserID, newSessionID)
+
+	newAccessToken, err := token.CreateAccessToken(
+		currentSession.UserID,
+		newSessionID,
+	)
 	if err != nil {
 		return LoginResult{}, err
 	}
@@ -176,8 +190,10 @@ func (s *Service) Refresh(
 		RefreshTokenHash: crypto.HashToken(newRefreshToken),
 		FamilyID:         currentSession.FamilyID,
 		DeviceType:       currentSession.DeviceType,
-		ExpiresAt:        currentSession.ExpiresAt,
-		CreatedAt:        time.Now(),
+
+		ExpiresAt: currentSession.ExpiresAt,
+
+		CreatedAt: now,
 	}
 
 	if err := s.session.Rotate(
@@ -204,7 +220,6 @@ func (s *Service) Refresh(
 	}, nil
 }
 
-// GetProfile fetches the full user record by ID.
 func (s *Service) GetProfile(ctx context.Context, userID uuid.UUID) (user.User, error) {
 	u, err := s.users.FindByID(ctx, userID)
 	if err != nil {
@@ -213,7 +228,6 @@ func (s *Service) GetProfile(ctx context.Context, userID uuid.UUID) (user.User, 
 	return u, nil
 }
 
-// UpdateProfile validates and persists the user's onboarding data.
 func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, data user.ProfileData) (user.User, error) {
 	validWorkTypes := map[user.WorkType]bool{
 		user.WorkTypeUber:           true,
@@ -232,7 +246,7 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, data user
 
 	u, err := s.users.UpdateProfile(ctx, userID, data)
 	if err != nil {
-		// Check for duplicate phone number constraint violation
+
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "users_phone_number_key" {
 			return user.User{}, ErrPhoneAlreadyExists
@@ -242,8 +256,6 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, data user
 	return u, nil
 }
 
-// ChangePassword verifies the user's current password then replaces it.
-// userID comes from the JWT claim via middleware — no email lookup needed.
 func (s *Service) ChangePassword(
 	ctx context.Context,
 	userID uuid.UUID,

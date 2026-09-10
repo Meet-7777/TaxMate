@@ -8,7 +8,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// WorkType describes how the user earns on ABN.
 type WorkType string
 
 const (
@@ -23,7 +22,6 @@ const (
 	WorkTypeOther          WorkType = "other"
 )
 
-// User is the full user record including optional profile fields.
 type User struct {
 	ID                 uuid.UUID
 	Email              string
@@ -39,12 +37,10 @@ type User struct {
 	ProfileCompletedAt *time.Time
 }
 
-// ProfileCompleted reports whether the user has finished onboarding.
 func (u *User) ProfileCompleted() bool {
 	return u.ProfileCompletedAt != nil
 }
 
-// ProfileData holds the fields updated during onboarding.
 type ProfileData struct {
 	FirstName string
 	LastName  string
@@ -54,7 +50,6 @@ type ProfileData struct {
 	NeedsBAS  bool
 }
 
-// UserRepository is the interface the auth service depends on.
 type UserRepository interface {
 	Create(ctx context.Context, email string, passwordHash string) (User, error)
 	FindByEmail(ctx context.Context, email string) (User, error)
@@ -63,7 +58,6 @@ type UserRepository interface {
 	UpdateProfile(ctx context.Context, id uuid.UUID, data ProfileData) (User, error)
 }
 
-// Repository is the concrete postgres implementation.
 type Repository struct {
 	db *pgxpool.Pool
 }
@@ -125,7 +119,6 @@ func (r *Repository) UpdatePassword(ctx context.Context, id uuid.UUID, passwordH
 	return err
 }
 
-// UpdateProfile writes profile fields and stamps profile_completed_at on first save.
 func (r *Repository) UpdateProfile(ctx context.Context, id uuid.UUID, data ProfileData) (User, error) {
 	var phone *string
 	if data.Phone != "" {

@@ -19,8 +19,6 @@ func NewHandler(service *Service) *Handler {
 	return &Handler{service: service}
 }
 
-// ── request types ─────────────────────────────────────────────────────────────
-
 type SignupRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
@@ -29,7 +27,7 @@ type SignupRequest struct {
 type LoginRequest struct {
 	Email      string `json:"email"`
 	Password   string `json:"password"`
-	DeviceType string `json:"device_type"` // optional, defaults to "laptop"
+	DeviceType string `json:"device_type"`
 }
 
 type ChangePasswordRequest struct {
@@ -46,9 +44,6 @@ type UpdateProfileRequest struct {
 	NeedsBAS  bool   `json:"needs_bas"`
 }
 
-// ── response helpers ──────────────────────────────────────────────────────────
-
-// profileResponse is the shape returned by /me and PATCH /me/profile.
 type profileResponse struct {
 	ID               string  `json:"id"`
 	Email            string  `json:"email"`
@@ -85,8 +80,6 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(v)
 }
-
-// ── handlers ──────────────────────────────────────────────────────────────────
 
 func (h *Handler) Signup(w http.ResponseWriter, r *http.Request) {
 	var req SignupRequest
@@ -126,7 +119,6 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Default to laptop if not provided
 	if req.DeviceType == "" {
 		req.DeviceType = "laptop"
 	}
@@ -179,7 +171,6 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// Me returns the full user profile. Requires access_token cookie.
 func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserID(r.Context())
 	if !ok {
@@ -200,7 +191,6 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, toProfileResponse(u))
 }
 
-// UpdateProfile saves the user's onboarding data. Requires access_token cookie.
 func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserID(r.Context())
 	if !ok {
@@ -255,13 +245,11 @@ func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, toProfileResponse(u))
 }
 
-// Logout clears both auth cookies.
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	clearAuthCookies(w)
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// ChangePassword verifies the old password then replaces it.
 func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserID(r.Context())
 	if !ok {
@@ -300,8 +288,6 @@ func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// ── cookie helpers ─────────────────────────────────────────────────────────────
-
 func setAuthCookies(w http.ResponseWriter, refreshToken, accessToken string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "refresh_token",
@@ -317,7 +303,7 @@ func setAuthCookies(w http.ResponseWriter, refreshToken, accessToken string) {
 		Path:     "/",
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
-		MaxAge:   15 * 60,
+		MaxAge:   7 * 24 * 60 * 60,
 	})
 }
 
@@ -340,5 +326,4 @@ func clearAuthCookies(w http.ResponseWriter) {
 	})
 }
 
-// unused import guard — time is used by cookie MaxAge calculation reference
 var _ = time.Second

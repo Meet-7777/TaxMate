@@ -38,7 +38,7 @@ export default function SignupPage() {
     formState: { errors, isSubmitting },
   } = useForm<SignupFormValues>({ resolver: zodResolver(signupSchema) })
 
-  // Cross-tab sync: if another tab signed in / signed up, redirect here too.
+  
   if (state.status === 'authenticated') {
     return <Navigate to="/dashboard" replace />
   }
@@ -47,7 +47,7 @@ export default function SignupPage() {
     setServerError('')
     try {
       await signup(values.email, values.password)
-      // Navigate to login with success message
+      
       navigate('/login', { 
         state: { 
           message: "Account created! Please sign in with your new credentials.",

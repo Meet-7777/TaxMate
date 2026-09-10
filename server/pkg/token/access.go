@@ -20,9 +20,9 @@ func CreateAccessToken(userID uuid.UUID, sessionID uuid.UUID) (string, error) {
 	now := time.Now()
 	claims := jwt.MapClaims{
 		"sub": userID.String(),
-		"sid": sessionID.String(), // Add session ID to token
+		"sid": sessionID.String(),
 		"iat": now.Unix(),
-		"exp": now.Add(15 * time.Minute).Unix(),
+		"exp": now.Add(15 * time.Second).Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString(getSecretKey())
