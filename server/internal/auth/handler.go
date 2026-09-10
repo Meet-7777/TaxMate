@@ -244,6 +244,10 @@ func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
+		if errors.Is(err, ErrPhoneAlreadyExists) {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
 		http.Error(w, "failed to update profile", http.StatusInternalServerError)
 		return
 	}

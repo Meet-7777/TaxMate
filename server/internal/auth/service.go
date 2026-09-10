@@ -22,6 +22,7 @@ var ErrInvalidDeviceType = errors.New("invalid device type")
 var ErrIncorrectPassword = errors.New("current password is incorrect")
 var ErrUserNotFound = errors.New("user not found")
 var ErrInvalidWorkType = errors.New("invalid work_type: must be one of uber, didi, ubereats, doordash, menulog, casual_employee, freelancer, tradie, other")
+var ErrPhoneAlreadyExists = errors.New("phone number already registered")
 
 type Service struct {
 	users       user.UserRepository
@@ -231,6 +232,11 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, data user
 
 	u, err := s.users.UpdateProfile(ctx, userID, data)
 	if err != nil {
+		// Check for duplicate phone number constraint violation
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "users_phone_number_key" {
+			return user.User{}, ErrPhoneAlreadyExists
+		}
 		return user.User{}, err
 	}
 	return u, nil
