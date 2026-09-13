@@ -48,12 +48,8 @@ export default function SignupPage() {
     try {
       await signup(values.email, values.password)
       
-      navigate('/login', { 
-        state: { 
-          message: "Account created! Please sign in with your new credentials.",
-          email: values.email 
-        } 
-      })
+      // Redirect to check-email page after successful signup
+      navigate(`/check-email?email=${encodeURIComponent(values.email)}`)
     } catch (err) {
       if (axios.isAxiosError(err)) {
         const msg = err.response?.data

@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"errors"
-
 	"time"
 
 	"github.com/Meet-7777/taxmate-server/internal/email"
@@ -18,6 +17,7 @@ import (
 var ErrInvalidPassword = errors.New("password must be at least 8 characters")
 var ErrEmailAlreadyExists = errors.New("email already exists")
 var ErrInvalidCredentials = errors.New("invalid credentials")
+var ErrEmailNotVerified = errors.New("email not verified")
 var ErrInvalidRefreshToken = errors.New("invalid refresh token")
 var ErrInvalidDeviceType = errors.New("invalid device type")
 var ErrIncorrectPassword = errors.New("current password is incorrect")
@@ -40,12 +40,18 @@ type LoginResult struct {
 	AccessToken  string
 }
 
-func NewService(repo user.UserRepository, sessionRepo session.Repository, emailService email.Service, verificationTokenRepo email.Repository) *Service {
+func NewService(
+	repo user.UserRepository,
+	sessionRepo session.Repository,
+	emailService email.Service,
+	verificationTokenRepo email.Repository,
+) *Service {
 	return &Service{
-		users:       repo,
-		session:     sessionRepo,
-		coordinator: session.NewRefreshCoordinator(),
-		email:       emailService,
+		users:              repo,
+		session:            sessionRepo,
+		coordinator:        session.NewRefreshCoordinator(),
+		email:              emailService,
+		verificationTokens: verificationTokenRepo,
 	}
 }
 
@@ -54,7 +60,6 @@ func (s *Service) Signup(
 	email string,
 	password string,
 ) (user.User, error) {
-
 	if len(password) < 8 {
 		return user.User{}, ErrInvalidPassword
 	}
@@ -65,7 +70,6 @@ func (s *Service) Signup(
 	}
 
 	newUser, err := s.users.Create(ctx, email, passwordHash)
-
 	if err != nil {
 		var pgErr *pgconn.PgError
 
@@ -73,6 +77,10 @@ func (s *Service) Signup(
 			return user.User{}, ErrEmailAlreadyExists
 		}
 
+		return user.User{}, err
+	}
+
+	if err := s.SendVerificationEmail(ctx, newUser); err != nil {
 		return user.User{}, err
 	}
 
@@ -85,7 +93,6 @@ func (s *Service) Login(
 	password string,
 	deviceType session.DeviceType,
 ) (LoginResult, error) {
-
 	if !session.IsValidDeviceType(deviceType) {
 		return LoginResult{}, ErrInvalidDeviceType
 	}
@@ -97,6 +104,10 @@ func (s *Service) Login(
 
 	if !crypto.VerifyPassword(password, u.PasswordHash) {
 		return LoginResult{}, ErrInvalidCredentials
+	}
+
+	if !u.EmailVerified {
+		return LoginResult{}, ErrEmailNotVerified
 	}
 
 	refreshToken, err := crypto.GenerateToken()
@@ -121,10 +132,8 @@ func (s *Service) Login(
 		RefreshTokenHash: crypto.HashToken(refreshToken),
 		FamilyID:         sessionID,
 		DeviceType:       deviceType,
-
-		ExpiresAt: now.Add(7 * 24 * time.Hour),
-
-		CreatedAt: now,
+		ExpiresAt:        now.Add(7 * 24 * time.Hour),
+		CreatedAt:        now,
 	}
 
 	if err := s.session.Create(ctx, newSession); err != nil {
@@ -142,7 +151,6 @@ func (s *Service) Refresh(
 	ctx context.Context,
 	refreshToken string,
 ) (LoginResult, error) {
-
 	refreshTokenHash := crypto.HashToken(refreshToken)
 
 	unlock := s.coordinator.Lock(refreshTokenHash)
@@ -194,10 +202,8 @@ func (s *Service) Refresh(
 		RefreshTokenHash: crypto.HashToken(newRefreshToken),
 		FamilyID:         currentSession.FamilyID,
 		DeviceType:       currentSession.DeviceType,
-
-		ExpiresAt: currentSession.ExpiresAt,
-
-		CreatedAt: now,
+		ExpiresAt:        currentSession.ExpiresAt,
+		CreatedAt:        now,
 	}
 
 	if err := s.session.Rotate(
@@ -224,15 +230,49 @@ func (s *Service) Refresh(
 	}, nil
 }
 
-func (s *Service) GetProfile(ctx context.Context, userID uuid.UUID) (user.User, error) {
+func (s *Service) VerifyEmail(
+	ctx context.Context,
+	rawToken string,
+) error {
+	token, err := s.verificationTokens.FindValidVerificationToken(
+		ctx,
+		rawToken,
+	)
+	if err != nil {
+		return email.ErrInvalidVerificationToken
+	}
+
+	if err := s.users.VerifyEmail(ctx, token.UserID); err != nil {
+		return err
+	}
+
+	if err := s.verificationTokens.MarkVerificationTokenUsed(
+		ctx,
+		token.ID,
+	); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Service) GetProfile(
+	ctx context.Context,
+	userID uuid.UUID,
+) (user.User, error) {
 	u, err := s.users.FindByID(ctx, userID)
 	if err != nil {
 		return user.User{}, ErrUserNotFound
 	}
+
 	return u, nil
 }
 
-func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, data user.ProfileData) (user.User, error) {
+func (s *Service) UpdateProfile(
+	ctx context.Context,
+	userID uuid.UUID,
+	data user.ProfileData,
+) (user.User, error) {
 	validWorkTypes := map[user.WorkType]bool{
 		user.WorkTypeUber:           true,
 		user.WorkTypeDiDi:           true,
@@ -244,24 +284,28 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, data user
 		user.WorkTypeTradie:         true,
 		user.WorkTypeOther:          true,
 	}
+
 	if !validWorkTypes[data.WorkType] {
 		return user.User{}, ErrInvalidWorkType
 	}
 
 	u, err := s.users.UpdateProfile(ctx, userID, data)
 	if err != nil {
-
 		var pgErr *pgconn.PgError
+
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 			if pgErr.ConstraintName == "users_phone_number_key" {
 				return user.User{}, ErrPhoneAlreadyExists
 			}
+
 			if pgErr.ConstraintName == "users_abn_key" {
 				return user.User{}, ErrABNAlreadyExists
 			}
 		}
+
 		return user.User{}, err
 	}
+
 	return u, nil
 }
 
@@ -321,4 +365,20 @@ func (s *Service) SendVerificationEmail(
 		u.Email,
 		verificationURL,
 	)
+}
+
+func (s *Service) ResendVerificationEmail(
+	ctx context.Context,
+	emailAddr string,
+) error {
+	u, err := s.users.FindByEmail(ctx, emailAddr)
+	if err != nil {
+		return ErrUserNotFound
+	}
+
+	if u.EmailVerified {
+		return errors.New("email already verified")
+	}
+
+	return s.SendVerificationEmail(ctx, u)
 }

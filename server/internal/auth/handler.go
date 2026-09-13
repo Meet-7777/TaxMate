@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Meet-7777/taxmate-server/internal/email"
 	"github.com/Meet-7777/taxmate-server/internal/middleware"
 	"github.com/Meet-7777/taxmate-server/internal/session"
 	"github.com/Meet-7777/taxmate-server/internal/user"
@@ -58,10 +59,12 @@ type profileResponse struct {
 
 func toProfileResponse(u user.User) profileResponse {
 	var workType *string
+
 	if u.WorkType != nil {
 		s := string(*u.WorkType)
 		workType = &s
 	}
+
 	return profileResponse{
 		ID:               u.ID.String(),
 		Email:            u.Email,
@@ -83,25 +86,34 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 
 func (h *Handler) Signup(w http.ResponseWriter, r *http.Request) {
 	var req SignupRequest
+
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
 	}
+
 	if req.Email == "" {
 		http.Error(w, "email is required", http.StatusBadRequest)
 		return
 	}
 
-	u, err := h.service.Signup(r.Context(), req.Email, req.Password)
+	u, err := h.service.Signup(
+		r.Context(),
+		req.Email,
+		req.Password,
+	)
+
 	if err != nil {
 		if errors.Is(err, ErrInvalidPassword) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+
 		if errors.Is(err, ErrEmailAlreadyExists) {
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}
+
 		http.Error(w, "failed to create user", http.StatusInternalServerError)
 		return
 	}
@@ -112,8 +124,88 @@ func (h *Handler) Signup(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (h *Handler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
+	rawToken := r.URL.Query().Get("token")
+
+	if rawToken == "" {
+		http.Error(
+			w,
+			"verification token is required",
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	err := h.service.VerifyEmail(
+		r.Context(),
+		rawToken,
+	)
+
+	if err != nil {
+		if errors.Is(err, email.ErrInvalidVerificationToken) {
+			http.Error(
+				w,
+				err.Error(),
+				http.StatusBadRequest,
+			)
+			return
+		}
+
+		http.Error(
+			w,
+			"failed to verify email",
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"message": "email verified successfully",
+	})
+}
+
+type ResendVerificationRequest struct {
+	Email string `json:"email"`
+}
+
+func (h *Handler) ResendVerification(w http.ResponseWriter, r *http.Request) {
+	var req ResendVerificationRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	if req.Email == "" {
+		http.Error(w, "email is required", http.StatusBadRequest)
+		return
+	}
+
+	err := h.service.ResendVerificationEmail(r.Context(), req.Email)
+
+	if err != nil {
+		if errors.Is(err, ErrUserNotFound) {
+			http.Error(w, "user not found", http.StatusNotFound)
+			return
+		}
+
+		if err.Error() == "email already verified" {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		http.Error(w, "failed to resend verification email", http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"message": "verification email sent",
+	})
+}
+
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	var req LoginRequest
+
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
@@ -124,26 +216,45 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	deviceType := session.DeviceType(req.DeviceType)
+
 	if !session.IsValidDeviceType(deviceType) {
 		http.Error(w, "invalid device type", http.StatusBadRequest)
 		return
 	}
 
-	result, err := h.service.Login(r.Context(), req.Email, req.Password, deviceType)
+	result, err := h.service.Login(
+		r.Context(),
+		req.Email,
+		req.Password,
+		deviceType,
+	)
+
 	if err != nil {
 		if errors.Is(err, ErrInvalidCredentials) {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
+
+		if errors.Is(err, ErrEmailNotVerified) {
+			http.Error(w, err.Error(), http.StatusForbidden)
+			return
+		}
+
 		if errors.Is(err, ErrInvalidDeviceType) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+
 		http.Error(w, "failed to login", http.StatusInternalServerError)
 		return
 	}
 
-	setAuthCookies(w, result.RefreshToken, result.AccessToken)
+	setAuthCookies(
+		w,
+		result.RefreshToken,
+		result.AccessToken,
+	)
+
 	writeJSON(w, http.StatusOK, map[string]string{
 		"id":    result.User.ID.String(),
 		"email": result.User.Email,
@@ -152,105 +263,148 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("refresh_token")
+
 	if err != nil {
 		http.Error(w, "missing refresh token", http.StatusUnauthorized)
 		return
 	}
 
-	result, err := h.service.Refresh(r.Context(), cookie.Value)
+	result, err := h.service.Refresh(
+		r.Context(),
+		cookie.Value,
+	)
+
 	if err != nil {
 		if errors.Is(err, ErrInvalidRefreshToken) {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
+
 		http.Error(w, "failed to refresh session", http.StatusInternalServerError)
 		return
 	}
 
-	setAuthCookies(w, result.RefreshToken, result.AccessToken)
+	setAuthCookies(
+		w,
+		result.RefreshToken,
+		result.AccessToken,
+	)
+
 	w.WriteHeader(http.StatusOK)
 }
 
 func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserID(r.Context())
+
 	if !ok {
 		http.Error(w, "user not found", http.StatusInternalServerError)
 		return
 	}
 
-	u, err := h.service.GetProfile(r.Context(), userID)
+	u, err := h.service.GetProfile(
+		r.Context(),
+		userID,
+	)
+
 	if err != nil {
 		if errors.Is(err, ErrUserNotFound) {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
+
 		http.Error(w, "failed to fetch user", http.StatusInternalServerError)
 		return
 	}
 
-	writeJSON(w, http.StatusOK, toProfileResponse(u))
+	writeJSON(
+		w,
+		http.StatusOK,
+		toProfileResponse(u),
+	)
 }
 
 func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserID(r.Context())
+
 	if !ok {
 		http.Error(w, "user not found", http.StatusInternalServerError)
 		return
 	}
 
 	var req UpdateProfileRequest
+
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
 	}
 
 	if req.FirstName == "" || req.LastName == "" {
-		http.Error(w, "first_name and last_name are required", http.StatusBadRequest)
+		http.Error(
+			w,
+			"first_name and last_name are required",
+			http.StatusBadRequest,
+		)
 		return
 	}
+
 	if req.Phone == "" {
 		http.Error(w, "phone is required", http.StatusBadRequest)
 		return
 	}
+
 	if req.ABN == "" {
 		http.Error(w, "abn is required", http.StatusBadRequest)
 		return
 	}
+
 	if req.WorkType == "" {
 		http.Error(w, "work_type is required", http.StatusBadRequest)
 		return
 	}
 
-	u, err := h.service.UpdateProfile(r.Context(), userID, user.ProfileData{
-		FirstName: req.FirstName,
-		LastName:  req.LastName,
-		Phone:     req.Phone,
-		ABN:       req.ABN,
-		WorkType:  user.WorkType(req.WorkType),
-		NeedsBAS:  req.NeedsBAS,
-	})
+	u, err := h.service.UpdateProfile(
+		r.Context(),
+		userID,
+		user.ProfileData{
+			FirstName: req.FirstName,
+			LastName:  req.LastName,
+			Phone:     req.Phone,
+			ABN:       req.ABN,
+			WorkType:  user.WorkType(req.WorkType),
+			NeedsBAS:  req.NeedsBAS,
+		},
+	)
+
 	if err != nil {
 		if errors.Is(err, ErrInvalidWorkType) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+
 		if errors.Is(err, ErrUserNotFound) {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
+
 		if errors.Is(err, ErrPhoneAlreadyExists) {
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}
+
 		if errors.Is(err, ErrABNAlreadyExists) {
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}
+
 		http.Error(w, "failed to update profile", http.StatusInternalServerError)
 		return
 	}
 
-	writeJSON(w, http.StatusOK, toProfileResponse(u))
+	writeJSON(
+		w,
+		http.StatusOK,
+		toProfileResponse(u),
+	)
 }
 
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
@@ -260,35 +414,51 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserID(r.Context())
+
 	if !ok {
 		http.Error(w, "user not found", http.StatusInternalServerError)
 		return
 	}
 
 	var req ChangePasswordRequest
+
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
 	}
+
 	if req.OldPassword == "" || req.NewPassword == "" {
-		http.Error(w, "old_password and new_password are required", http.StatusBadRequest)
+		http.Error(
+			w,
+			"old_password and new_password are required",
+			http.StatusBadRequest,
+		)
 		return
 	}
 
-	err := h.service.ChangePassword(r.Context(), userID, req.OldPassword, req.NewPassword)
+	err := h.service.ChangePassword(
+		r.Context(),
+		userID,
+		req.OldPassword,
+		req.NewPassword,
+	)
+
 	if err != nil {
 		if errors.Is(err, ErrInvalidPassword) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+
 		if errors.Is(err, ErrIncorrectPassword) {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
+
 		if errors.Is(err, ErrUserNotFound) {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
+
 		http.Error(w, "failed to change password", http.StatusInternalServerError)
 		return
 	}
@@ -296,7 +466,11 @@ func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func setAuthCookies(w http.ResponseWriter, refreshToken, accessToken string) {
+func setAuthCookies(
+	w http.ResponseWriter,
+	refreshToken string,
+	accessToken string,
+) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "refresh_token",
 		Value:    refreshToken,
@@ -305,6 +479,7 @@ func setAuthCookies(w http.ResponseWriter, refreshToken, accessToken string) {
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   7 * 24 * 60 * 60,
 	})
+
 	http.SetCookie(w, &http.Cookie{
 		Name:     "access_token",
 		Value:    accessToken,
@@ -324,6 +499,7 @@ func clearAuthCookies(w http.ResponseWriter) {
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   -1,
 	})
+
 	http.SetCookie(w, &http.Cookie{
 		Name:     "access_token",
 		Value:    "",

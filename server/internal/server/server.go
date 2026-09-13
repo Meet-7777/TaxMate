@@ -52,6 +52,8 @@ func New(
 	router.Route("/api", func(r chi.Router) {
 		r.Post("/auth/signup", authHandler.Signup)
 		r.Post("/auth/login", authHandler.Login)
+		r.Post("/auth/verify-email", authHandler.VerifyEmail)
+		r.Post("/auth/resend-verification", authHandler.ResendVerification)
 		r.Post("/auth/refresh", authHandler.Refresh)
 		r.Post("/auth/logout", authHandler.Logout)
 

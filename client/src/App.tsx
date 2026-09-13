@@ -7,6 +7,8 @@ import { ProtectedRoute } from '@/components/ProtectedRoute'
 import LandingPage from '@/pages/LandingPage'
 import LoginPage from '@/pages/LoginPage'
 import SignupPage from '@/pages/SignupPage'
+import CheckEmailPage from '@/pages/CheckEmailPage'
+import VerifyEmailPage from '@/pages/VerifyEmailPage'
 import DashboardPage from '@/pages/DashboardPage'
 import ChangePasswordPage from '@/pages/ChangePasswordPage'
 import OnboardingPage from '@/pages/OnboardingPage'
@@ -30,6 +32,8 @@ export default function App() {
               <Route path="/" element={<LandingPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/signup" element={<SignupPage />} />
+              <Route path="/check-email" element={<CheckEmailPage />} />
+              <Route path="/verify-email" element={<VerifyEmailPage />} />
 
               {/* Onboarding — protected but only reachable before profile is complete */}
               <Route

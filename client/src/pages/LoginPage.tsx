@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Link, useNavigate, Navigate, useLocation } from 'react-router-dom'
+import { Link, useNavigate, Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import { motion, type Variants } from 'framer-motion'
-import { Eye, EyeOff, ArrowRight } from 'lucide-react'
+import { Eye, EyeOff, ArrowRight, Mail, Loader2 } from 'lucide-react'
 import { loginSchema, type LoginFormValues } from '@/lib/schemas'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
@@ -11,8 +11,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { FormError } from '@/components/FormError'
 import { FieldError } from '@/components/FieldError'
+import { Card } from '@/components/ui/card'
 import { TaxMateMark } from '@/components/TaxMateLogo'
 import axios from 'axios'
+import api from '@/api/client'
 
 // Stagger container — children animate in sequence
 const container: Variants = {
@@ -30,18 +32,25 @@ export default function LoginPage() {
   const { login, state } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const [searchParams] = useSearchParams()
   const [serverError, setServerError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [showResendPanel, setShowResendPanel] = useState(false)
+  const [resendEmail, setResendEmail] = useState('')
+  const [resending, setResending] = useState(false)
+  const [resendSuccess, setResendSuccess] = useState(false)
 
-  // Check for success message from signup
+  // Check for success message from signup or verification needed
   useEffect(() => {
     if (location.state?.message) {
       setSuccessMessage(location.state.message)
-      // Clear the message from location state
       window.history.replaceState({}, document.title)
     }
-  }, [location.state])
+    if (searchParams.get('verification_needed') === 'true') {
+      setShowResendPanel(true)
+    }
+  }, [location.state, searchParams])
 
   const {
     register,
@@ -60,17 +69,45 @@ export default function LoginPage() {
 
   async function onSubmit(values: LoginFormValues) {
     setServerError('')
-    setSuccessMessage('') // Clear success message on login attempt
+    setSuccessMessage('')
+    setShowResendPanel(false)
     try {
       await login(values.email, values.password)
       navigate('/dashboard')
     } catch (err) {
       if (axios.isAxiosError(err)) {
+        const status = err.response?.status
         const msg = err.response?.data
-        setServerError(typeof msg === 'string' ? msg.trim() : 'Failed to sign in. Please try again.')
+        
+        // Handle email not verified (403)
+        if (status === 403 && typeof msg === 'string' && msg.includes('email not verified')) {
+          setServerError('Your email address has not been verified yet.')
+          setShowResendPanel(true)
+          setResendEmail(values.email)
+        } else {
+          setServerError(typeof msg === 'string' ? msg.trim() : 'Failed to sign in. Please try again.')
+        }
       } else {
         setServerError('Something unexpected happened.')
       }
+    }
+  }
+
+  async function handleResendVerification() {
+    if (!resendEmail) return
+    
+    setResending(true)
+    setResendSuccess(false)
+    
+    try {
+      await api.post('/api/auth/resend-verification', { email: resendEmail })
+      setResendSuccess(true)
+      setServerError('')
+    } catch (err: any) {
+      const message = err?.response?.data || 'Failed to resend verification email'
+      setServerError(message)
+    } finally {
+      setResending(false)
     }
   }
 
@@ -221,6 +258,53 @@ export default function LoginPage() {
                 )}
               </Button>
             </motion.div>
+
+            {/* Email not verified - Resend panel */}
+            {showResendPanel && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                className="overflow-hidden"
+              >
+                <Card className="border-[#2C5F4E]/20 bg-[#2C5F4E]/5 p-4">
+                  <div className="flex items-start gap-3">
+                    <Mail className="h-5 w-5 text-[#2C5F4E] shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-[#1A1A1A] mb-1">
+                        Verify your email address
+                      </p>
+                      {resendSuccess ? (
+                        <p className="text-sm text-[#2C5F4E] font-medium">
+                          ✓ Verification email sent! Check your inbox.
+                        </p>
+                      ) : (
+                        <>
+                          <p className="text-sm text-[#6B6B6B] mb-3">
+                            Check your email for a verification link, or request a new one below.
+                          </p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={handleResendVerification}
+                            disabled={resending || !resendEmail}
+                          >
+                            {resending ? (
+                              <>
+                                <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                                Sending...
+                              </>
+                            ) : (
+                              'Resend verification email'
+                            )}
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              </motion.div>
+            )}
           </form>
 
           <motion.p variants={item} className="mt-6 text-sm text-[#6B6B6B]">

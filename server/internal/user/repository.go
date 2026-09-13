@@ -121,6 +121,11 @@ func (r *Repository) UpdatePassword(ctx context.Context, id uuid.UUID, passwordH
 }
 
 func (r *Repository) UpdateProfile(ctx context.Context, id uuid.UUID, data ProfileData) (User, error) {
+	var phone *string
+	if data.Phone != "" {
+		phone = &data.Phone
+	}
+
 	row := r.db.QueryRow(ctx, `
 		UPDATE users SET
 			first_name           = $1,
@@ -135,7 +140,7 @@ func (r *Repository) UpdateProfile(ctx context.Context, id uuid.UUID, data Profi
 		RETURNING `+selectCols,
 		data.FirstName,
 		data.LastName,
-		data.Phone,
+		phone,
 		data.ABN,
 		data.WorkType,
 		data.NeedsBAS,
