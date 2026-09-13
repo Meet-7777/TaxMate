@@ -208,6 +208,10 @@ func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "first_name and last_name are required", http.StatusBadRequest)
 		return
 	}
+	if req.Phone == "" {
+		http.Error(w, "phone is required", http.StatusBadRequest)
+		return
+	}
 	if req.ABN == "" {
 		http.Error(w, "abn is required", http.StatusBadRequest)
 		return
@@ -235,6 +239,10 @@ func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if errors.Is(err, ErrPhoneAlreadyExists) {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
+		if errors.Is(err, ErrABNAlreadyExists) {
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}

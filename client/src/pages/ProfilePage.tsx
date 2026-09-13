@@ -60,6 +60,9 @@ export default function ProfilePage() {
     if (!formData.last_name.trim()) {
       newErrors.last_name = 'Last name is required'
     }
+    if (!formData.phone.trim()) {
+      newErrors.phone = 'Phone number is required'
+    }
     if (!formData.abn.trim()) {
       newErrors.abn = 'ABN is required'
     } else if (!/^\d{11}$/.test(formData.abn.replace(/\s/g, ''))) {
@@ -87,7 +90,18 @@ export default function ProfilePage() {
       })
       setIsEditing(false)
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to update profile. Please try again.')
+      const errorMessage = err?.response?.data || err?.message || 'Failed to update profile. Please try again.'
+      
+      // Handle specific conflict errors
+      if (errorMessage.includes('phone number already registered')) {
+        setError('This phone number is already registered. Please use a different phone number.')
+        setErrors((prev) => ({ ...prev, phone: 'Already registered' }))
+      } else if (errorMessage.includes('ABN already registered')) {
+        setError('This ABN is already registered. Please use a different ABN.')
+        setErrors((prev) => ({ ...prev, abn: 'Already registered' }))
+      } else {
+        setError(errorMessage)
+      }
     } finally {
       setIsSubmitting(false)
     }
@@ -156,12 +170,10 @@ export default function ProfilePage() {
                   <p className="mt-1 text-base text-gray-900">{user.email}</p>
                 </div>
 
-                {user.phone && (
-                  <div>
-                    <p className="text-sm font-medium text-gray-500">Phone</p>
-                    <p className="mt-1 text-base text-gray-900">{user.phone}</p>
-                  </div>
-                )}
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Phone</p>
+                  <p className="mt-1 text-base text-gray-900">{user.phone || '—'}</p>
+                </div>
 
                 <div>
                   <p className="text-sm font-medium text-gray-500">ABN</p>
@@ -220,17 +232,19 @@ export default function ProfilePage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="phone">Phone (optional)</Label>
+                  <Label htmlFor="phone">Phone *</Label>
                   <Input
                     id="phone"
                     type="tel"
                     value={formData.phone}
-                    onChange={(e) =>
+                    onChange={(e) => {
                       setFormData((prev) => ({ ...prev, phone: e.target.value }))
-                    }
-                    placeholder="+61 412 345 678"
+                      setErrors((prev) => ({ ...prev, phone: undefined }))
+                    }}
+                    placeholder="04xx xxx xxx"
                     disabled={isSubmitting}
                   />
+                  {errors.phone && <FieldError message={errors.phone} />}
                 </div>
 
                 <div>

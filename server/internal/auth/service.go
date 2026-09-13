@@ -6,6 +6,7 @@ import (
 
 	"time"
 
+	"github.com/Meet-7777/taxmate-server/internal/email"
 	"github.com/Meet-7777/taxmate-server/internal/session"
 	"github.com/Meet-7777/taxmate-server/internal/user"
 	"github.com/Meet-7777/taxmate-server/pkg/crypto"
@@ -23,11 +24,14 @@ var ErrIncorrectPassword = errors.New("current password is incorrect")
 var ErrUserNotFound = errors.New("user not found")
 var ErrInvalidWorkType = errors.New("invalid work_type: must be one of uber, didi, ubereats, doordash, menulog, casual_employee, freelancer, tradie, other")
 var ErrPhoneAlreadyExists = errors.New("phone number already registered")
+var ErrABNAlreadyExists = errors.New("ABN already registered")
 
 type Service struct {
-	users       user.UserRepository
-	session     session.Repository
-	coordinator *session.RefreshCoordinator
+	users              user.UserRepository
+	session            session.Repository
+	coordinator        *session.RefreshCoordinator
+	email              email.Service
+	verificationTokens email.Repository
 }
 
 type LoginResult struct {
@@ -36,11 +40,12 @@ type LoginResult struct {
 	AccessToken  string
 }
 
-func NewService(repo user.UserRepository, sessionRepo session.Repository) *Service {
+func NewService(repo user.UserRepository, sessionRepo session.Repository, emailService email.Service, verificationTokenRepo email.Repository) *Service {
 	return &Service{
 		users:       repo,
 		session:     sessionRepo,
 		coordinator: session.NewRefreshCoordinator(),
+		email:       emailService,
 	}
 }
 
@@ -117,7 +122,6 @@ func (s *Service) Login(
 		FamilyID:         sessionID,
 		DeviceType:       deviceType,
 
-		// Refresh token/session expires 7 days after login.
 		ExpiresAt: now.Add(7 * 24 * time.Hour),
 
 		CreatedAt: now,
@@ -248,8 +252,13 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, data user
 	if err != nil {
 
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "users_phone_number_key" {
-			return user.User{}, ErrPhoneAlreadyExists
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			if pgErr.ConstraintName == "users_phone_number_key" {
+				return user.User{}, ErrPhoneAlreadyExists
+			}
+			if pgErr.ConstraintName == "users_abn_key" {
+				return user.User{}, ErrABNAlreadyExists
+			}
 		}
 		return user.User{}, err
 	}
@@ -281,4 +290,35 @@ func (s *Service) ChangePassword(
 	}
 
 	return s.users.UpdatePassword(ctx, userID, newHash)
+}
+
+func (s *Service) SendVerificationEmail(
+	ctx context.Context,
+	u user.User,
+) error {
+	rawToken, err := crypto.GenerateToken()
+	if err != nil {
+		return err
+	}
+
+	expiresAt := time.Now().Add(24 * time.Hour)
+
+	err = s.verificationTokens.CreateVerificationToken(
+		ctx,
+		u.ID,
+		rawToken,
+		expiresAt,
+	)
+	if err != nil {
+		return err
+	}
+
+	verificationURL :=
+		"http://localhost:3000/verify-email?token=" + rawToken
+
+	return s.email.SendVerificationEmail(
+		ctx,
+		u.Email,
+		verificationURL,
+	)
 }

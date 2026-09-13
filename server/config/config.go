@@ -10,17 +10,36 @@ type Config struct {
 	Port        string
 	DatabaseURL string
 	RedisURL    string
+
+	AWS AWSConfig
+
+	Email EmailConfig
+}
+
+type AWSConfig struct {
+	Region string
+}
+
+type EmailConfig struct {
+	FromAddress string
 }
 
 func Load() *Config {
-	err := godotenv.Load()
-
-	if err != nil {
+	if err := godotenv.Load(); err != nil {
 		panic("failed to load .env")
 	}
+
 	return &Config{
 		Port:        os.Getenv("PORT"),
 		DatabaseURL: os.Getenv("DATABASE_URL"),
 		RedisURL:    os.Getenv("REDIS_URL"),
+
+		AWS: AWSConfig{
+			Region: os.Getenv("AWS_REGION"),
+		},
+
+		Email: EmailConfig{
+			FromAddress: os.Getenv("EMAIL_FROM_ADDRESS"),
+		},
 	}
 }

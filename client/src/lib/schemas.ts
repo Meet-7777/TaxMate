@@ -65,7 +65,7 @@ export function defaultNeedsBAS(workType: string): boolean {
 export const profileStep1Schema = z.object({
   first_name: z.string().min(1, 'First name is required'),
   last_name:  z.string().min(1, 'Last name is required'),
-  phone:      z.string().optional(),
+  phone:      z.string().min(1, 'Phone number is required'),
 })
 
 export const profileStep2Schema = z.object({

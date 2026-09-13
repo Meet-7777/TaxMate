@@ -134,14 +134,25 @@ export default function OnboardingPage() {
       await completeProfile({
         first_name: step1Data.first_name,
         last_name:  step1Data.last_name,
-        phone:      step1Data.phone ?? '',
+        phone:      step1Data.phone,
         abn:        step2Data.abn,
         work_type:  step2Data.work_type as WorkType,
         needs_bas:  step2Data.needs_bas,
       })
       navigate('/dashboard', { replace: true })
-    } catch {
-      setFormError('Something went wrong. Please try again.')
+    } catch (err: any) {
+      const errorMessage = err?.response?.data || err?.message || 'Something went wrong. Please try again.'
+      
+      // Handle specific conflict errors
+      if (errorMessage.includes('phone number already registered')) {
+        setFormError('This phone number is already registered. Please use a different phone number.')
+        goTo(1) // Go back to step 1 where phone is
+      } else if (errorMessage.includes('ABN already registered')) {
+        setFormError('This ABN is already registered. Please use a different ABN.')
+        goTo(2) // Go back to step 2 where ABN is
+      } else {
+        setFormError(errorMessage)
+      }
     } finally {
       setSubmitting(false)
     }
@@ -220,16 +231,14 @@ export default function OnboardingPage() {
                     </div>
 
                     <div className="space-y-1.5">
-                      <Label htmlFor="phone">
-                        Phone{' '}
-                        <span className="text-[#9B9B9B] font-normal">(optional)</span>
-                      </Label>
+                      <Label htmlFor="phone">Phone</Label>
                       <Input
                         id="phone"
                         type="tel"
                         placeholder="04xx xxx xxx"
                         {...form1.register('phone')}
                       />
+                      <FieldError message={form1.formState.errors.phone?.message} />
                     </div>
 
                     <Button type="submit" className="w-full gap-2">

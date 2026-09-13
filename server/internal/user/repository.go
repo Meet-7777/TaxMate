@@ -56,6 +56,7 @@ type UserRepository interface {
 	FindByID(ctx context.Context, id uuid.UUID) (User, error)
 	UpdatePassword(ctx context.Context, id uuid.UUID, passwordHash string) error
 	UpdateProfile(ctx context.Context, id uuid.UUID, data ProfileData) (User, error)
+	VerifyEmail(ctx context.Context, id uuid.UUID) error
 }
 
 type Repository struct {
@@ -120,11 +121,6 @@ func (r *Repository) UpdatePassword(ctx context.Context, id uuid.UUID, passwordH
 }
 
 func (r *Repository) UpdateProfile(ctx context.Context, id uuid.UUID, data ProfileData) (User, error) {
-	var phone *string
-	if data.Phone != "" {
-		phone = &data.Phone
-	}
-
 	row := r.db.QueryRow(ctx, `
 		UPDATE users SET
 			first_name           = $1,
@@ -139,11 +135,26 @@ func (r *Repository) UpdateProfile(ctx context.Context, id uuid.UUID, data Profi
 		RETURNING `+selectCols,
 		data.FirstName,
 		data.LastName,
-		phone,
+		data.Phone,
 		data.ABN,
 		data.WorkType,
 		data.NeedsBAS,
 		id,
 	)
 	return scanUser(row)
+}
+
+func (r *Repository) VerifyEmail(
+	ctx context.Context,
+	id uuid.UUID,
+) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE users
+		SET
+			email_verified = TRUE,
+			updated_at = NOW()
+		WHERE id = $1
+	`, id)
+
+	return err
 }
