@@ -19,6 +19,18 @@ export default function VerifyEmailPage() {
 
   const token = searchParams.get('token')
 
+  // Listen for auth changes (login from another tab)
+  useEffect(() => {
+    function handleStorageChange(e: StorageEvent) {
+      if (e.key === 'taxmate_email' && e.newValue) {
+        // User logged in from another tab, redirect to dashboard
+        navigate('/dashboard', { replace: true })
+      }
+    }
+    window.addEventListener('storage', handleStorageChange)
+    return () => window.removeEventListener('storage', handleStorageChange)
+  }, [navigate])
+
   useEffect(() => {
     if (!token) {
       setStatus('error')

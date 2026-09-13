@@ -69,6 +69,11 @@ func (s *Service) Signup(
 		return user.User{}, err
 	}
 
+	rawToken, err := crypto.GenerateToken()
+	if err != nil {
+		return user.User{}, err
+	}
+
 	newUser, err := s.users.Create(ctx, email, passwordHash)
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -80,7 +85,15 @@ func (s *Service) Signup(
 		return user.User{}, err
 	}
 
-	if err := s.SendVerificationEmail(ctx, newUser); err != nil {
+	expiresAt := time.Now().Add(24 * time.Hour)
+	err = s.verificationTokens.CreateVerificationToken(ctx, newUser.ID, rawToken, expiresAt)
+	if err != nil {
+		return user.User{}, err
+	}
+
+	verificationURL := "http://localhost:5173/verify-email?token=" + rawToken
+	err = s.email.SendVerificationEmail(ctx, newUser.Email, verificationURL)
+	if err != nil {
 		return user.User{}, err
 	}
 
