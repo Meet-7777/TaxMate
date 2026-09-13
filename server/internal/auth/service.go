@@ -358,7 +358,7 @@ func (s *Service) SendVerificationEmail(
 	}
 
 	verificationURL :=
-		"http://localhost:3000/verify-email?token=" + rawToken
+		"http://localhost:5173/verify-email?token=" + rawToken
 
 	return s.email.SendVerificationEmail(
 		ctx,
