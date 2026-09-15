@@ -32,6 +32,7 @@ type Service struct {
 	coordinator        *session.RefreshCoordinator
 	email              email.Service
 	verificationTokens email.Repository
+	frontendURL        string
 }
 
 type LoginResult struct {
@@ -45,6 +46,7 @@ func NewService(
 	sessionRepo session.Repository,
 	emailService email.Service,
 	verificationTokenRepo email.Repository,
+	frontendURL string,
 ) *Service {
 	return &Service{
 		users:              repo,
@@ -52,6 +54,7 @@ func NewService(
 		coordinator:        session.NewRefreshCoordinator(),
 		email:              emailService,
 		verificationTokens: verificationTokenRepo,
+		frontendURL:        frontendURL,
 	}
 }
 
@@ -91,7 +94,7 @@ func (s *Service) Signup(
 		return user.User{}, err
 	}
 
-	verificationURL := "http://localhost:5173/verify-email?token=" + rawToken
+	verificationURL := s.frontendURL + "/verify-email?token=" + rawToken
 	err = s.email.SendVerificationEmail(ctx, newUser.Email, verificationURL)
 	if err != nil {
 		return user.User{}, err
@@ -371,7 +374,7 @@ func (s *Service) SendVerificationEmail(
 	}
 
 	verificationURL :=
-		"http://localhost:5173/verify-email?token=" + rawToken
+		s.frontendURL + "/verify-email?token=" + rawToken
 
 	return s.email.SendVerificationEmail(
 		ctx,

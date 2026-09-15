@@ -45,6 +45,7 @@ func New(
 		sessionRepo,
 		emailService,
 		verificationTokenRepo,
+		cfg.FrontendURL,
 	)
 
 	authHandler := auth.NewHandler(authService)

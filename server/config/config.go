@@ -10,6 +10,7 @@ type Config struct {
 	Port        string
 	DatabaseURL string
 	RedisURL    string
+	FrontendURL string
 
 	AWS AWSConfig
 
@@ -33,6 +34,7 @@ func Load() *Config {
 		Port:        os.Getenv("PORT"),
 		DatabaseURL: os.Getenv("DATABASE_URL"),
 		RedisURL:    os.Getenv("REDIS_URL"),
+		FrontendURL: os.Getenv("FRONTEND_URL"),
 
 		AWS: AWSConfig{
 			Region: os.Getenv("AWS_REGION"),
